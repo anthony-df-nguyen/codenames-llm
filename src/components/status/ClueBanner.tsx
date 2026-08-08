@@ -1,13 +1,18 @@
 import { motion } from "framer-motion";
-import type { Team } from "@/lib/game/types";
+import type { Clue, Team } from "@/lib/game/types";
+import { MUTED_TEXT, TEAM_STYLES } from "@/lib/ui/styles";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/Button";
 import { BotStatus } from "./BotStatus";
 
 export interface ClueBannerProps {
-  clue: { clue: string; number: number };
+  clue: Clue;
   team: Team;
-  guessesLeft: number;
+  /** null = unlimited guesses (clue number was 0). */
+  guessesLeft: number | null;
   interactive: boolean;
+  /** Teams must guess at least once per clue before they may stop. */
+  canStop: boolean;
   onStop: () => void;
   // Non-null while a bot is guessing against this clue — shown instead of
   // the human "Stop guessing" control.
@@ -19,6 +24,7 @@ export function ClueBanner({
   team,
   guessesLeft,
   interactive,
+  canStop,
   onStop,
   phase,
 }: ClueBannerProps) {
@@ -30,18 +36,14 @@ export function ClueBanner({
       transition={{ duration: 0.25 }}
       className={cn(
         "flex w-full flex-col items-center gap-3 rounded-xl border-2 px-6 py-4 text-center",
-        team === "red"
-          ? "border-red-500 bg-red-50 dark:bg-red-950/30"
-          : "border-blue-500 bg-blue-50 dark:bg-blue-950/30",
+        TEAM_STYLES[team].panel,
       )}
     >
       <div className="flex items-baseline gap-3">
         <span
           className={cn(
             "text-3xl font-extrabold uppercase tracking-wide",
-            team === "red"
-              ? "text-red-600 dark:text-red-400"
-              : "text-blue-600 dark:text-blue-400",
+            TEAM_STYLES[team].textStrong,
           )}
         >
           {clue.clue}
@@ -53,16 +55,20 @@ export function ClueBanner({
 
       {interactive ? (
         <>
-          <span className="text-sm text-zinc-500 dark:text-zinc-400">
-            guesses left: {guessesLeft}
+          <span className={cn("text-sm", MUTED_TEXT)}>
+            guesses left: {guessesLeft ?? "unlimited"}
           </span>
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="sm"
             onClick={onStop}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600"
+            disabled={!canStop}
+            title={
+              canStop ? undefined : "You must make at least one guess first"
+            }
           >
             Stop guessing
-          </button>
+          </Button>
         </>
       ) : (
         <BotStatus phase={phase} team={team} />

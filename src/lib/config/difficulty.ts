@@ -39,3 +39,7 @@ export const DIFFICULTY_CONFIGS: Record<Difficulty, DifficultyConfig> = {
     guesser: { model: "llama3.1:8b", temperature: 0.8, systemPromptVariant: "expert" },
   },
 };
+
+// Derived from the config map so the picker in the UI can never list a level
+// that has no config behind it.
+export const DIFFICULTIES = Object.keys(DIFFICULTY_CONFIGS) as Difficulty[];

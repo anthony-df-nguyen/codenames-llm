@@ -1,0 +1,309 @@
+"use client";
+
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { requestSpymasterClue } from "@/app/actions";
+import type { Difficulty } from "@/lib/config/difficulty";
+import { runBotGuessTurn, describeTurnEnd } from "@/lib/game/botTurn";
+import type { LogEntryInput, TurnEndReason } from "@/lib/game/log";
+import { makeLogEntry } from "@/lib/game/log";
+import {
+  clearPersistedGame,
+  loadPersistedGame,
+  savePersistedGame,
+} from "@/lib/game/persistence";
+import type { GameSession, LastGuess } from "@/lib/game/session";
+import { CLUE_CLEARED, INITIAL_SESSION } from "@/lib/game/session";
+import {
+  createInitialState,
+  endTurn,
+  giveClue,
+  guessAllowance,
+  resolveGuess,
+} from "@/lib/game/state";
+import type { GameState, HumanRole, Team } from "@/lib/game/types";
+import { randomTeam } from "@/lib/game/types";
+
+type Patch = Partial<GameSession> | ((s: GameSession) => Partial<GameSession>);
+
+type Action =
+  | { type: "patch"; patch: Patch }
+  | { type: "appendLog"; entry: LogEntryInput };
+
+// The session fields move together (on hydrate, game start, clue/guess
+// resolution), so one reducer keeps each of those moments a single dispatch
+// and a single render instead of several setStates.
+function sessionReducer(current: GameSession, action: Action): GameSession {
+  switch (action.type) {
+    case "patch": {
+      const patch =
+        typeof action.patch === "function"
+          ? action.patch(current)
+          : action.patch;
+      return { ...current, ...patch };
+    }
+    case "appendLog":
+      return { ...current, log: [...current.log, makeLogEntry(action.entry)] };
+  }
+}
+
+function isHumanControlled(s: GameState, team: Team, role: HumanRole) {
+  return team === s.humanTeam && role === s.humanRole;
+}
+
+/**
+ * Owns the whole client-side game loop: session state, persistence, the two
+ * bot-turn effects, and the human move handlers. `page.tsx` consumes this and
+ * does nothing but render.
+ */
+export function useCodenamesGame() {
+  const [session, dispatch] = useReducer(sessionReducer, INITIAL_SESSION);
+  const { state, difficulty, pendingClue, guessesLeft, guessesMade, log } =
+    session;
+
+  const [clueError, setClueError] = useState<string | undefined>();
+  const [botBusy, setBotBusy] = useState(false);
+  const [botPhase, setBotPhase] = useState<string | null>(null);
+  const [lastGuess, setLastGuess] = useState<LastGuess | null>(null);
+
+  const patch = useCallback((p: Patch) => dispatch({ type: "patch", patch: p }), []);
+  const appendLog = useCallback(
+    (entry: LogEntryInput) => dispatch({ type: "appendLog", entry }),
+    [],
+  );
+
+  // Guards so each bot turn fires once per clue, keyed by clue count.
+  const clueKeyRef = useRef<string | null>(null);
+  const guessKeyRef = useRef<string | null>(null);
+  const hydratedRef = useRef(false);
+
+  function resetTurnGuards() {
+    clueKeyRef.current = null;
+    guessKeyRef.current = null;
+  }
+
+  // Restore a saved game on first mount (client-only, so this runs after the
+  // initial render rather than in a lazy initializer).
+  useEffect(() => {
+    const saved = loadPersistedGame();
+    if (saved) {
+      patch({ ...saved, guessesMade: saved.guessesMade ?? 0 });
+      // Leave both key guards null so a bot turn that was in flight when the
+      // page was refreshed resumes instead of getting stuck waiting forever.
+      resetTurnGuards();
+    }
+    hydratedRef.current = true;
+  }, [patch]);
+
+  // Persist on every change, once the initial restore has happened.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (!state) {
+      clearPersistedGame();
+      return;
+    }
+    savePersistedGame({
+      state,
+      difficulty,
+      pendingClue,
+      guessesLeft,
+      guessesMade,
+      log,
+    });
+  }, [state, difficulty, pendingClue, guessesLeft, guessesMade, log]);
+
+  // Bot spymaster's turn to give a clue.
+  useEffect(() => {
+    if (!state || state.winner || pendingClue) return;
+    if (isHumanControlled(state, state.currentTurn, "spymaster")) return;
+
+    const key = `clue-${state.cluesGiven.length}`;
+    if (clueKeyRef.current === key) return;
+    clueKeyRef.current = key;
+
+    const team = state.currentTurn;
+    setBotBusy(true);
+    setBotPhase(`${team} spymaster is thinking of a clue…`);
+    requestSpymasterClue(state.board, difficulty, team, state.cluesGiven)
+      .then((result) => {
+        patch((current) => ({
+          state: current.state
+            ? giveClue(current.state, result.clue, result.number)
+            : current.state,
+          pendingClue: result,
+          guessesLeft: guessAllowance(result.number),
+          guessesMade: 0,
+        }));
+        appendLog({
+          type: "clue",
+          team,
+          source: "bot",
+          clue: result.clue,
+          number: result.number,
+        });
+      })
+      .catch((e: unknown) =>
+        appendLog({
+          type: "error",
+          team,
+          message: `spymaster error: ${e instanceof Error ? e.message : String(e)}`,
+        }),
+      )
+      .finally(() => {
+        setBotBusy(false);
+        setBotPhase(null);
+      });
+  }, [state, pendingClue, difficulty, patch, appendLog]);
+
+  // Bot guesser's turn to guess.
+  useEffect(() => {
+    if (!state || state.winner || !pendingClue) return;
+    if (isHumanControlled(state, state.currentTurn, "guesser")) return;
+
+    const key = `guess-${state.cluesGiven.length}`;
+    if (guessKeyRef.current === key) return;
+    guessKeyRef.current = key;
+
+    setBotBusy(true);
+    runBotGuessTurn(state, pendingClue, difficulty, guessesLeft, {
+      setState: (s) => patch({ state: s }),
+      appendLog,
+      setPhase: setBotPhase,
+      setLastGuess,
+    }).finally(() => {
+      patch(CLUE_CLEARED);
+      setBotBusy(false);
+    });
+  }, [state, pendingClue, difficulty, guessesLeft, patch, appendLog]);
+
+  function startGame(role: HumanRole, diff: Difficulty) {
+    patch({
+      ...INITIAL_SESSION,
+      state: createInitialState(randomTeam(), role),
+      difficulty: diff,
+    });
+    setClueError(undefined);
+    resetTurnGuards();
+  }
+
+  function submitClue(clue: string, number: number) {
+    if (!state) return;
+    try {
+      patch({
+        state: giveClue(state, clue, number),
+        pendingClue: { clue, number },
+        guessesLeft: guessAllowance(number),
+        guessesMade: 0,
+      });
+      setClueError(undefined);
+      appendLog({
+        type: "clue",
+        team: state.currentTurn,
+        source: "human",
+        clue,
+        number,
+      });
+    } catch (e) {
+      setClueError(e instanceof Error ? e.message : "Invalid clue");
+    }
+  }
+
+  function submitGuess(word: string) {
+    if (!state || !pendingClue) return;
+    if (guessesLeft !== null && guessesLeft <= 0) return;
+    const prevTeam = state.currentTurn;
+    const card = state.board.find((c) => c.word === word);
+    if (!card || card.revealed) return;
+
+    let next = resolveGuess(state, word);
+    let turnEnded = next.currentTurn !== prevTeam || Boolean(next.winner);
+    let turnEndReason: TurnEndReason | null = turnEnded
+      ? describeTurnEnd(state, next, word)
+      : null;
+
+    const remaining = guessesLeft === null ? null : guessesLeft - 1;
+    if (!turnEnded && remaining !== null && remaining <= 0) {
+      next = endTurn(next);
+      turnEnded = true;
+      turnEndReason = "guesses-exhausted";
+    }
+
+    patch({
+      state: next,
+      ...(turnEnded
+        ? CLUE_CLEARED
+        : { guessesLeft: remaining, guessesMade: guessesMade + 1 }),
+    });
+
+    const correct = card.type === prevTeam;
+    setLastGuess({ word, correct });
+    appendLog({
+      type: "guess",
+      team: prevTeam,
+      source: "human",
+      word,
+      cardType: card.type,
+      correct,
+    });
+    if (turnEndReason) {
+      appendLog({ type: "turn-end", team: prevTeam, reason: turnEndReason });
+    }
+  }
+
+  function stopGuessing() {
+    if (!state || !pendingClue) return;
+    // Official rules: a team must make at least one guess per clue.
+    if (guessesMade < 1) return;
+    appendLog({ type: "turn-end", team: state.currentTurn, reason: "stopped" });
+    patch({ state: endTurn(state), ...CLUE_CLEARED });
+  }
+
+  function endSession() {
+    patch({ ...INITIAL_SESSION, difficulty });
+    setClueError(undefined);
+    setBotBusy(false);
+    setBotPhase(null);
+    setLastGuess(null);
+    resetTurnGuards();
+  }
+
+  function restart() {
+    if (!window.confirm("Restart the game? Current progress will be lost.")) {
+      return;
+    }
+    endSession();
+  }
+
+  // Whether the human is the one on the clock right now, per phase of turn.
+  const humanIsSpymasterNow = Boolean(
+    state &&
+      !state.winner &&
+      !pendingClue &&
+      isHumanControlled(state, state.currentTurn, "spymaster"),
+  );
+  const humanIsGuesserNow = Boolean(
+    state &&
+      !state.winner &&
+      pendingClue &&
+      isHumanControlled(state, state.currentTurn, "guesser"),
+  );
+
+  return {
+    state,
+    pendingClue,
+    guessesLeft,
+    guessesMade,
+    log,
+    clueError,
+    botBusy,
+    botPhase,
+    lastGuess,
+    humanIsSpymasterNow,
+    humanIsGuesserNow,
+    startGame,
+    submitClue,
+    submitGuess,
+    stopGuessing,
+    restart,
+    endSession,
+  };
+}

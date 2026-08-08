@@ -1,17 +1,14 @@
 // Spymaster bot: sees the key card, returns a clue + number.
 // Must never share state/context with the guesser bot module.
 
-import type { Card, Team } from "@/lib/game/types";
+import type { Card, Clue, ClueRecord, Team } from "@/lib/game/types";
+import { otherTeam } from "@/lib/game/types";
 import type { DifficultyConfig } from "@/lib/config/difficulty";
 import { ollamaGenerate } from "@/lib/ollama/client";
 import { validateClue, type ClueValidationResult } from "@/lib/game/state";
+import { selectSystemPrompt, type PromptVariants } from "./prompts";
 
-export interface SpymasterClue {
-  clue: string;
-  number: number;
-}
-
-const SYSTEM_PROMPT_VARIANTS: Record<string, string> = {
+const SYSTEM_PROMPT_VARIANTS: PromptVariants = {
   easy: `You are playing Codenames as Spymaster. Give conservative, literal
 one-word clues connecting as few words as possible (usually 1-2). Avoid
 ambiguous or risky associations, and never let your clue relate to the
@@ -32,19 +29,15 @@ this turn while keeping the risk of hitting the assassin or the other
 team's words as low as possible.`,
 };
 
-function buildSystemPrompt(variant: string): string {
-  return SYSTEM_PROMPT_VARIANTS[variant] ?? SYSTEM_PROMPT_VARIANTS.medium;
-}
-
 function buildUserPrompt(
   board: Card[],
   team: Team,
-  cluesGiven: { team: Team; clue: string; number: number }[],
+  cluesGiven: ClueRecord[],
   rejectionReason?: string
 ): string {
   const unrevealed = board.filter((c) => !c.revealed);
   const myWords = unrevealed.filter((c) => c.type === team).map((c) => c.word);
-  const opponentTeam: Team = team === "red" ? "blue" : "red";
+  const opponentTeam = otherTeam(team);
   const opponentWords = unrevealed
     .filter((c) => c.type === opponentTeam)
     .map((c) => c.word);
@@ -65,7 +58,8 @@ function buildUserPrompt(
       : `No clues have been given yet this game.`,
     ``,
     `Respond with a single-word clue that is not any board word (or a
-substring/superset of one) and a number of your team's words it connects.`,
+substring/superset of one) and a number of your team's words it connects
+(at most ${myWords.length}; 0 means your team may guess without limit).`,
   ];
 
   if (rejectionReason) {
@@ -75,11 +69,6 @@ substring/superset of one) and a number of your team's words it connects.`,
   }
 
   return lines.join("\n");
-}
-
-interface RawSpymasterResponse {
-  clue: string;
-  number: number;
 }
 
 const RESPONSE_SCHEMA = {
@@ -97,10 +86,13 @@ export async function getSpymasterClue(
   board: Card[],
   difficulty: DifficultyConfig,
   team: Team,
-  cluesGiven: { team: Team; clue: string; number: number }[] = []
-): Promise<SpymasterClue> {
+  cluesGiven: ClueRecord[] = []
+): Promise<Clue> {
   const config = difficulty.spymaster;
-  const system = buildSystemPrompt(config.systemPromptVariant);
+  const system = selectSystemPrompt(
+    SYSTEM_PROMPT_VARIANTS,
+    config.systemPromptVariant
+  );
 
   let rejectionReason: string | undefined;
   let lastResult: ClueValidationResult | undefined;
@@ -108,7 +100,7 @@ export async function getSpymasterClue(
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const prompt = buildUserPrompt(board, team, cluesGiven, rejectionReason);
 
-    const raw = await ollamaGenerate<RawSpymasterResponse>({
+    const raw = await ollamaGenerate<Clue>({
       model: config.model,
       system,
       prompt,
@@ -119,16 +111,13 @@ export async function getSpymasterClue(
     const clue = String(raw.clue ?? "").trim();
     const number = Number(raw.number);
 
-    lastResult = validateClue(clue, board, cluesGiven);
-    const numberValid = Number.isInteger(number) && number >= 0;
+    lastResult = validateClue(clue, number, board, cluesGiven, team);
 
-    if (lastResult.valid && numberValid) {
+    if (lastResult.valid) {
       return { clue, number };
     }
 
-    rejectionReason = !numberValid
-      ? "Number must be a non-negative integer."
-      : lastResult.reason;
+    rejectionReason = lastResult.reason;
   }
 
   throw new Error(

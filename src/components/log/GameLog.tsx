@@ -1,27 +1,35 @@
 import { AnimatePresence, motion } from "framer-motion";
-import type { LogEntry } from "@/lib/game/log";
+import type { LogEntry, LogSource } from "@/lib/game/log";
 import { TURN_END_LABEL } from "@/lib/game/log";
-import type { Team } from "@/lib/game/types";
+import { CARD_TYPE_STYLES, TEAM_STYLES } from "@/lib/ui/styles";
 import { cn } from "@/lib/utils";
 
 export interface GameLogProps {
   entries: LogEntry[];
 }
 
-const TEAM_TEXT: Record<Team, string> = {
-  red: "text-red-600 dark:text-red-400",
-  blue: "text-blue-600 dark:text-blue-400",
-};
-
-const CARD_TYPE_DOT: Record<string, string> = {
-  red: "bg-red-500",
-  blue: "bg-blue-500",
-  neutral: "bg-zinc-400",
-  assassin: "bg-black dark:bg-zinc-200",
-};
-
-function sourceLabel(source: "bot" | "human") {
+function sourceLabel(source: LogSource) {
   return source === "human" ? "(you)" : "(bot)";
+}
+
+function TeamName({
+  team,
+  bold,
+}: {
+  team: LogEntry["team"];
+  bold?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "capitalize",
+        bold && "font-semibold",
+        TEAM_STYLES[team].textStrong,
+      )}
+    >
+      {team}
+    </span>
+  );
 }
 
 function EntryRow({ entry }: { entry: LogEntry }) {
@@ -29,12 +37,8 @@ function EntryRow({ entry }: { entry: LogEntry }) {
     case "clue":
       return (
         <p>
-          <span
-            className={cn("font-semibold capitalize", TEAM_TEXT[entry.team])}
-          >
-            {entry.team}
-          </span>{" "}
-          spymaster {sourceLabel(entry.source)}:{" "}
+          <TeamName team={entry.team} bold /> spymaster{" "}
+          {sourceLabel(entry.source)}:{" "}
           <span className="font-semibold text-foreground">
             &quot;{entry.clue}&quot;
           </span>{" "}
@@ -47,21 +51,19 @@ function EntryRow({ entry }: { entry: LogEntry }) {
           <span
             className={cn(
               "inline-block h-2 w-2 shrink-0 rounded-full",
-              CARD_TYPE_DOT[entry.cardType],
+              CARD_TYPE_STYLES[entry.cardType].swatch,
             )}
           />
           <span>
-            <span className={cn("capitalize", TEAM_TEXT[entry.team])}>
-              {entry.team}
-            </span>{" "}
-            guesser {sourceLabel(entry.source)} guessed &quot;{entry.word}
-            &quot; —{" "}
+            <TeamName team={entry.team} /> guesser {sourceLabel(entry.source)}{" "}
+            guessed &quot;{entry.word}&quot; —{" "}
             <span
-              className={
+              className={cn(
+                "font-medium",
                 entry.correct
-                  ? "font-medium text-emerald-600 dark:text-emerald-400"
-                  : "font-medium text-zinc-500 dark:text-zinc-400"
-              }
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-zinc-500 dark:text-zinc-400",
+              )}
             >
               {entry.correct ? "correct" : entry.cardType}
             </span>

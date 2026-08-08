@@ -3,6 +3,11 @@
 import { useState } from "react";
 import type { HumanRole } from "@/lib/game/types";
 import type { Difficulty } from "@/lib/config/difficulty";
+import { DIFFICULTIES } from "@/lib/config/difficulty";
+import { MUTED_TEXT } from "@/lib/ui/styles";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/Button";
+import { OptionButton } from "@/components/ui/OptionButton";
 
 export interface GameSetupProps {
   onStart: (role: HumanRole, difficulty: Difficulty) => void;
@@ -21,7 +26,11 @@ const ROLES: { value: HumanRole; label: string; description: string }[] = [
   },
 ];
 
-const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard", "expert"];
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-sm font-medium text-foreground">{children}</span>
+  );
+}
 
 export function GameSetup({ onStart }: GameSetupProps) {
   const [role, setRole] = useState<HumanRole>("spymaster");
@@ -31,67 +40,52 @@ export function GameSetup({ onStart }: GameSetupProps) {
     <div className="flex w-full max-w-md flex-col gap-8">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Codenames</h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={cn("mt-1 text-sm", MUTED_TEXT)}>
           Play against Ollama-driven bots.
         </p>
       </div>
 
       <div className="flex flex-col gap-3">
-        <span className="text-sm font-medium text-foreground">
-          Your role
-        </span>
+        <FieldLabel>Your role</FieldLabel>
         <div className="grid grid-cols-2 gap-3">
           {ROLES.map((r) => (
-            <button
+            <OptionButton
               key={r.value}
-              type="button"
+              selected={role === r.value}
               onClick={() => setRole(r.value)}
-              aria-pressed={role === r.value}
-              className={`flex flex-col gap-1 rounded-lg border px-4 py-3 text-left transition-colors ${
-                role === r.value
-                  ? "border-foreground bg-foreground/5"
-                  : "border-zinc-300 hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600"
-              }`}
+              className="flex flex-col gap-1 rounded-lg px-4 py-3 text-left"
             >
               <span className="font-medium text-foreground">{r.label}</span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              <span className={cn("text-xs", MUTED_TEXT)}>
                 {r.description}
               </span>
-            </button>
+            </OptionButton>
           ))}
         </div>
       </div>
 
       <div className="flex flex-col gap-3">
-        <span className="text-sm font-medium text-foreground">
-          Difficulty
-        </span>
+        <FieldLabel>Difficulty</FieldLabel>
         <div className="grid grid-cols-4 gap-2">
           {DIFFICULTIES.map((d) => (
-            <button
+            <OptionButton
               key={d}
-              type="button"
+              selected={difficulty === d}
               onClick={() => setDifficulty(d)}
-              aria-pressed={difficulty === d}
-              className={`rounded-md border px-3 py-2 text-sm capitalize transition-colors ${
-                difficulty === d
-                  ? "border-foreground bg-foreground/5 font-medium"
-                  : "border-zinc-300 hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600"
-              }`}
+              className={cn(
+                "rounded-md px-3 py-2 text-sm capitalize",
+                difficulty === d && "font-medium",
+              )}
             >
               {d}
-            </button>
+            </OptionButton>
           ))}
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => onStart(role, difficulty)}
-        className="rounded-full bg-foreground px-5 py-3 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
-      >
+      <Button size="pill" onClick={() => onStart(role, difficulty)}>
         Start game
-      </button>
+      </Button>
     </div>
   );
 }

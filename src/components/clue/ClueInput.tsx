@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { validateClueFormat } from "@/lib/game/state";
+import { INPUT_STYLE } from "@/lib/ui/styles";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/Button";
 
 export interface ClueInputProps {
   onSubmit: (clue: string, number: number) => void;
-  /** Surface a rejection reason from server-side `validateClue` (the source
-   * of truth — this component only does a cheap client-side pre-check). */
+  /** Surface a rejection reason from `validateClue` (the source of truth —
+   * this component only pre-checks the board-independent rules). */
   error?: string;
   disabled?: boolean;
 }
@@ -19,12 +23,9 @@ export function ClueInput({ onSubmit, error, disabled }: ClueInputProps) {
     e.preventDefault();
     const trimmed = clue.trim();
 
-    if (!trimmed || /\s/.test(trimmed)) {
-      setLocalError("Clue must be a single word.");
-      return;
-    }
-    if (!Number.isInteger(number) || number < 0) {
-      setLocalError("Number must be a non-negative integer.");
+    const result = validateClueFormat(trimmed, number);
+    if (!result.valid) {
+      setLocalError(result.reason);
       return;
     }
 
@@ -42,7 +43,7 @@ export function ClueInput({ onSubmit, error, disabled }: ClueInputProps) {
           onChange={(e) => setClue(e.target.value)}
           placeholder="Clue"
           disabled={disabled}
-          className="flex-1 rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm text-foreground outline-none focus:border-foreground dark:border-zinc-700"
+          className={cn("flex-1", INPUT_STYLE)}
         />
         <input
           type="number"
@@ -51,15 +52,11 @@ export function ClueInput({ onSubmit, error, disabled }: ClueInputProps) {
           value={number}
           onChange={(e) => setNumber(Number(e.target.value))}
           disabled={disabled}
-          className="w-16 rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm text-foreground outline-none focus:border-foreground dark:border-zinc-700"
+          className={cn("w-16", INPUT_STYLE)}
         />
-        <button
-          type="submit"
-          disabled={disabled}
-          className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
-        >
+        <Button type="submit" disabled={disabled}>
           Give clue
-        </button>
+        </Button>
       </div>
       {(localError || error) && (
         <p className="text-xs text-red-500">{localError ?? error}</p>

@@ -2,20 +2,17 @@
 // or team assignments — no exceptions, even for debugging.
 // Must never share state/context with the spymaster bot module.
 
+import type { Clue, PublicCard } from "@/lib/game/types";
 import type { DifficultyConfig } from "@/lib/config/difficulty";
 import { ollamaGenerate } from "@/lib/ollama/client";
-
-export interface PublicCard {
-  word: string;
-  revealed: boolean;
-}
+import { selectSystemPrompt, type PromptVariants } from "./prompts";
 
 export interface GuesserResult {
   rankedGuesses: string[];
   stopGuessing: boolean;
 }
 
-const SYSTEM_PROMPT_VARIANTS: Record<string, string> = {
+const SYSTEM_PROMPT_VARIANTS: PromptVariants = {
   easy: `You are playing Codenames as Guesser. You see only the public board
 (unrevealed words) and your Spymaster's clue — never any hidden team
 information. Pick only the most obvious, literal word matches for the clue.
@@ -40,13 +37,9 @@ expected value stays positive given the clue's number, minimizing wasted
 guesses.`,
 };
 
-function buildSystemPrompt(variant: string): string {
-  return SYSTEM_PROMPT_VARIANTS[variant] ?? SYSTEM_PROMPT_VARIANTS.medium;
-}
-
 function buildUserPrompt(
   publicBoard: PublicCard[],
-  clue: { clue: string; number: number }
+  clue: Clue
 ): string {
   const unrevealed = publicBoard.filter((c) => !c.revealed).map((c) => c.word);
 
@@ -60,11 +53,6 @@ guessing after them.`,
   ].join("\n");
 }
 
-interface RawGuesserResponse {
-  rankedGuesses: string[];
-  stopGuessing: boolean;
-}
-
 const RESPONSE_SCHEMA = {
   type: "object",
   properties: {
@@ -76,14 +64,17 @@ const RESPONSE_SCHEMA = {
 
 export async function getGuesserGuesses(
   publicBoard: PublicCard[],
-  clue: { clue: string; number: number },
+  clue: Clue,
   difficulty: DifficultyConfig
 ): Promise<GuesserResult> {
   const config = difficulty.guesser;
-  const system = buildSystemPrompt(config.systemPromptVariant);
+  const system = selectSystemPrompt(
+    SYSTEM_PROMPT_VARIANTS,
+    config.systemPromptVariant
+  );
   const prompt = buildUserPrompt(publicBoard, clue);
 
-  const raw = await ollamaGenerate<RawGuesserResponse>({
+  const raw = await ollamaGenerate<GuesserResult>({
     model: config.model,
     system,
     prompt,

@@ -1,10 +1,18 @@
 // Turn state transitions and win/loss condition checks.
 
-import type { GameState, HumanRole, Team } from "./types";
+import type {
+  ClueRecord,
+  GameState,
+  HumanRole,
+  Team,
+} from "./types";
+import { otherTeam, randomTeam } from "./types";
 import { generateBoard } from "./board";
 
-function randomTeam(): Team {
-  return Math.random() < 0.5 ? "red" : "blue";
+// Official rules: a clue's number caps guesses at number + 1, except a clue
+// of 0, which allows unlimited guesses (represented as null).
+export function guessAllowance(clueNumber: number): number | null {
+  return clueNumber === 0 ? null : clueNumber + 1;
 }
 
 export function createInitialState(
@@ -31,7 +39,7 @@ export function checkWinner(state: GameState): GameState["winner"] {
     (c) => c.type === "assassin" && c.revealed
   );
   if (assassinRevealed) {
-    return state.currentTurn === "red" ? "blue" : "red";
+    return otherTeam(state.currentTurn);
   }
 
   for (const team of ["red", "blue"] as const) {
@@ -47,7 +55,7 @@ export function checkWinner(state: GameState): GameState["winner"] {
 export function endTurn(state: GameState): GameState {
   return {
     ...state,
-    currentTurn: state.currentTurn === "red" ? "blue" : "red",
+    currentTurn: otherTeam(state.currentTurn),
   };
 }
 
@@ -87,15 +95,45 @@ export interface ClueValidationResult {
   reason?: string;
 }
 
-export function validateClue(
+// Board-independent half of clue legality: shape of the clue and the number.
+// Split out so the clue input can pre-check a submission client-side without
+// duplicating the rules or their wording — `validateClue` remains the source
+// of truth and re-runs this.
+export function validateClueFormat(
   clue: string,
-  board: GameState["board"],
-  cluesGiven: GameState["cluesGiven"]
+  number: number
 ): ClueValidationResult {
   const trimmed = clue.trim();
 
+  if (!Number.isInteger(number) || number < 0) {
+    return { valid: false, reason: "Number must be a non-negative integer." };
+  }
   if (!trimmed || /\s/.test(trimmed)) {
     return { valid: false, reason: "Clue must be a single word." };
+  }
+  return { valid: true };
+}
+
+export function validateClue(
+  clue: string,
+  number: number,
+  board: GameState["board"],
+  cluesGiven: ClueRecord[],
+  team: Team
+): ClueValidationResult {
+  const format = validateClueFormat(clue, number);
+  if (!format.valid) return format;
+
+  const trimmed = clue.trim();
+
+  const remainingTeamWords = board.filter(
+    (c) => c.type === team && !c.revealed
+  ).length;
+  if (number > remainingTeamWords) {
+    return {
+      valid: false,
+      reason: `Number cannot exceed your team's remaining words (${remainingTeamWords}).`,
+    };
   }
 
   const normalizedClue = trimmed.toUpperCase();
@@ -128,7 +166,13 @@ export function giveClue(
   clue: string,
   number: number
 ): GameState {
-  const result = validateClue(clue, state.board, state.cluesGiven);
+  const result = validateClue(
+    clue,
+    number,
+    state.board,
+    state.cluesGiven,
+    state.currentTurn
+  );
   if (!result.valid) {
     throw new Error(result.reason);
   }

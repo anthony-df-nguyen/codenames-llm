@@ -3,7 +3,6 @@
 // `current` state variable rather than nested setState updaters.
 
 import { requestGuesserGuesses } from "@/app/actions";
-import type { Difficulty } from "@/lib/config/difficulty";
 import { sleep } from "@/lib/utils";
 import type { LogEntryInput, TurnEndReason } from "./log";
 import type { Clue, GameState } from "./types";
@@ -38,9 +37,9 @@ export interface BotGuessTurnHandlers {
 export async function runBotGuessTurn(
   initialState: GameState,
   clue: Clue,
-  difficulty: Difficulty,
   cap: number | null,
   { setState, appendLog, setPhase, setLastGuess }: BotGuessTurnHandlers,
+  modelOverride: string | null = null,
 ) {
   let current = initialState;
   const team = current.currentTurn;
@@ -51,7 +50,7 @@ export async function runBotGuessTurn(
     const result = await requestGuesserGuesses(
       toPublicBoard(current.board),
       clue,
-      difficulty,
+      modelOverride,
     );
     guesses =
       cap === null ? result.rankedGuesses : result.rankedGuesses.slice(0, cap);

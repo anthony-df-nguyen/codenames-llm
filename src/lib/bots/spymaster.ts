@@ -3,31 +3,9 @@
 
 import type { Card, Clue, ClueRecord, Team } from "@/lib/game/types";
 import { otherTeam } from "@/lib/game/types";
-import type { DifficultyConfig } from "@/lib/config/difficulty";
+import type { BotConfig } from "@/lib/config/botConfig";
 import { ollamaGenerate } from "@/lib/ollama/client";
 import { validateClue, type ClueValidationResult } from "@/lib/game/state";
-import { selectSystemPrompt, type PromptVariants } from "./prompts";
-
-const SYSTEM_PROMPT_VARIANTS: PromptVariants = {
-  easy: `You are playing Codenames as Spymaster. Give conservative, literal
-one-word clues connecting as few words as possible (usually 1-2). Avoid
-ambiguous or risky associations, and never let your clue relate to the
-assassin word or the other team's words.`,
-  medium: `You are playing Codenames as Spymaster. Give clues connecting a
-moderate number of your team's words (usually 2-3), using reasonable
-associative leaps. Never let your clue relate to the assassin word or the
-other team's words.`,
-  hard: `You are playing Codenames as Spymaster. Give efficient clues
-connecting several of your team's words (3-4+) using clever or abstract
-associations when they pay off. Carefully avoid any association with the
-assassin word or the other team's words, especially near-misses.`,
-  expert: `You are playing Codenames as Spymaster, playing to win. Find the
-highest-value clue available, taking calculated risks when the payoff
-justifies it. Reason step by step about every unrevealed word on the board,
-then commit to the clue that maximizes expected words guessed correctly
-this turn while keeping the risk of hitting the assassin or the other
-team's words as low as possible.`,
-};
 
 function buildUserPrompt(
   board: Card[],
@@ -84,15 +62,12 @@ const MAX_ATTEMPTS = 4;
 
 export async function getSpymasterClue(
   board: Card[],
-  difficulty: DifficultyConfig,
+  botConfig: BotConfig,
   team: Team,
   cluesGiven: ClueRecord[] = []
 ): Promise<Clue> {
-  const config = difficulty.spymaster;
-  const system = selectSystemPrompt(
-    SYSTEM_PROMPT_VARIANTS,
-    config.systemPromptVariant
-  );
+  const config = botConfig.spymaster;
+  const system = config.systemPrompt;
 
   let rejectionReason: string | undefined;
   let lastResult: ClueValidationResult | undefined;
@@ -105,6 +80,7 @@ export async function getSpymasterClue(
       system,
       prompt,
       temperature: config.temperature,
+      think: config.think,
       format: RESPONSE_SCHEMA,
     });
 

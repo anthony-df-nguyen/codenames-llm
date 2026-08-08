@@ -7,22 +7,40 @@
 
 import { getSpymasterClue } from "@/lib/bots/spymaster";
 import { getGuesserGuesses, type GuesserResult } from "@/lib/bots/guesser";
-import { DIFFICULTY_CONFIGS, type Difficulty } from "@/lib/config/difficulty";
+import { BASE_BOT_CONFIG, withModelOverride } from "@/lib/config/botConfig";
+import { listOllamaModels } from "@/lib/ollama/client";
 import type { Card, Clue, ClueRecord, PublicCard, Team } from "@/lib/game/types";
 
 export async function requestSpymasterClue(
   board: Card[],
-  difficulty: Difficulty,
   team: Team,
-  cluesGiven: ClueRecord[]
+  cluesGiven: ClueRecord[],
+  modelOverride: string | null = null
 ): Promise<Clue> {
-  return getSpymasterClue(board, DIFFICULTY_CONFIGS[difficulty], team, cluesGiven);
+  const config = withModelOverride(BASE_BOT_CONFIG, modelOverride);
+  console.log(
+    `[ollama] spymaster clue request → model=${config.spymaster.model} team=${team}`
+  );
+  return getSpymasterClue(board, config, team, cluesGiven);
 }
 
 export async function requestGuesserGuesses(
   publicBoard: PublicCard[],
   clue: Clue,
-  difficulty: Difficulty
+  modelOverride: string | null = null
 ): Promise<GuesserResult> {
-  return getGuesserGuesses(publicBoard, clue, DIFFICULTY_CONFIGS[difficulty]);
+  const config = withModelOverride(BASE_BOT_CONFIG, modelOverride);
+  console.log(
+    `[ollama] guesser request → model=${config.guesser.model} clue="${clue.clue}" number=${clue.number}`
+  );
+  return getGuesserGuesses(publicBoard, clue, config);
+}
+
+/** Models currently pulled in the local Ollama install, for the setup picker. */
+export async function getAvailableModels(): Promise<string[]> {
+  try {
+    return await listOllamaModels();
+  } catch {
+    return [];
+  }
 }

@@ -1,16 +1,16 @@
-// The client-side session around a GameState: which difficulty is in play,
-// the clue currently being guessed against, and the narrative log. Kept out
-// of GameState itself because none of it is rules state — the game would
-// play out identically without it.
+// The client-side session around a GameState: the clue currently being
+// guessed against, and the narrative log. Kept out of GameState itself
+// because none of it is rules state — the game would play out identically
+// without it.
 
-import type { Difficulty } from "@/lib/config/difficulty";
 import type { Clue, GameState } from "./types";
 import type { LogEntry } from "./log";
 
 export interface GameSession {
   /** null between games — the setup screen is showing. */
   state: GameState | null;
-  difficulty: Difficulty;
+  /** null = use the base config's default model for both bot roles. */
+  modelOverride: string | null;
   /** The clue the current team is guessing against, if any. */
   pendingClue: Clue | null;
   /** null = unlimited (clue number was 0). */
@@ -26,7 +26,7 @@ export type PersistedSession = GameSession & { state: GameState };
 
 export const INITIAL_SESSION: GameSession = {
   state: null,
-  difficulty: "medium",
+  modelOverride: null,
   pendingClue: null,
   guessesLeft: 0,
   guessesMade: 0,

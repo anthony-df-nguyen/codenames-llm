@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { requestSpymasterClue } from "@/app/actions";
-import type { Difficulty } from "@/lib/config/difficulty";
 import { runBotGuessTurn, describeTurnEnd } from "@/lib/game/botTurn";
 import type { LogEntryInput, TurnEndReason } from "@/lib/game/log";
 import { makeLogEntry } from "@/lib/game/log";
@@ -57,8 +56,14 @@ function isHumanControlled(s: GameState, team: Team, role: HumanRole) {
  */
 export function useCodenamesGame() {
   const [session, dispatch] = useReducer(sessionReducer, INITIAL_SESSION);
-  const { state, difficulty, pendingClue, guessesLeft, guessesMade, log } =
-    session;
+  const {
+    state,
+    modelOverride,
+    pendingClue,
+    guessesLeft,
+    guessesMade,
+    log,
+  } = session;
 
   const [clueError, setClueError] = useState<string | undefined>();
   const [botBusy, setBotBusy] = useState(false);
@@ -86,7 +91,11 @@ export function useCodenamesGame() {
   useEffect(() => {
     const saved = loadPersistedGame();
     if (saved) {
-      patch({ ...saved, guessesMade: saved.guessesMade ?? 0 });
+      patch({
+        ...saved,
+        modelOverride: saved.modelOverride ?? null,
+        guessesMade: saved.guessesMade ?? 0,
+      });
       // Leave both key guards null so a bot turn that was in flight when the
       // page was refreshed resumes instead of getting stuck waiting forever.
       resetTurnGuards();
@@ -103,13 +112,13 @@ export function useCodenamesGame() {
     }
     savePersistedGame({
       state,
-      difficulty,
+      modelOverride,
       pendingClue,
       guessesLeft,
       guessesMade,
       log,
     });
-  }, [state, difficulty, pendingClue, guessesLeft, guessesMade, log]);
+  }, [state, modelOverride, pendingClue, guessesLeft, guessesMade, log]);
 
   // Bot spymaster's turn to give a clue.
   useEffect(() => {
@@ -123,7 +132,12 @@ export function useCodenamesGame() {
     const team = state.currentTurn;
     setBotBusy(true);
     setBotPhase(`${team} spymaster is thinking of a clue…`);
-    requestSpymasterClue(state.board, difficulty, team, state.cluesGiven)
+    requestSpymasterClue(
+      state.board,
+      team,
+      state.cluesGiven,
+      modelOverride,
+    )
       .then((result) => {
         patch((current) => ({
           state: current.state
@@ -152,7 +166,7 @@ export function useCodenamesGame() {
         setBotBusy(false);
         setBotPhase(null);
       });
-  }, [state, pendingClue, difficulty, patch, appendLog]);
+  }, [state, pendingClue, modelOverride, patch, appendLog]);
 
   // Bot guesser's turn to guess.
   useEffect(() => {
@@ -164,22 +178,28 @@ export function useCodenamesGame() {
     guessKeyRef.current = key;
 
     setBotBusy(true);
-    runBotGuessTurn(state, pendingClue, difficulty, guessesLeft, {
-      setState: (s) => patch({ state: s }),
-      appendLog,
-      setPhase: setBotPhase,
-      setLastGuess,
-    }).finally(() => {
+    runBotGuessTurn(
+      state,
+      pendingClue,
+      guessesLeft,
+      {
+        setState: (s) => patch({ state: s }),
+        appendLog,
+        setPhase: setBotPhase,
+        setLastGuess,
+      },
+      modelOverride,
+    ).finally(() => {
       patch(CLUE_CLEARED);
       setBotBusy(false);
     });
-  }, [state, pendingClue, difficulty, guessesLeft, patch, appendLog]);
+  }, [state, pendingClue, modelOverride, guessesLeft, patch, appendLog]);
 
-  function startGame(role: HumanRole, diff: Difficulty) {
+  function startGame(role: HumanRole, model: string | null) {
     patch({
       ...INITIAL_SESSION,
       state: createInitialState(randomTeam(), role),
-      difficulty: diff,
+      modelOverride: model,
     });
     setClueError(undefined);
     resetTurnGuards();
@@ -258,7 +278,7 @@ export function useCodenamesGame() {
   }
 
   function endSession() {
-    patch({ ...INITIAL_SESSION, difficulty });
+    patch({ ...INITIAL_SESSION, modelOverride });
     setClueError(undefined);
     setBotBusy(false);
     setBotPhase(null);

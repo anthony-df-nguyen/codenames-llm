@@ -1,16 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { HumanRole } from "@/lib/game/types";
-import type { Difficulty } from "@/lib/config/difficulty";
-import { DIFFICULTIES } from "@/lib/config/difficulty";
+import { getAvailableModels } from "@/app/actions";
 import { MUTED_TEXT } from "@/lib/ui/styles";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { OptionButton } from "@/components/ui/OptionButton";
 
 export interface GameSetupProps {
-  onStart: (role: HumanRole, difficulty: Difficulty) => void;
+  onStart: (role: HumanRole, model: string | null) => void;
 }
 
 const ROLES: { value: HumanRole; label: string; description: string }[] = [
@@ -34,7 +33,15 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 export function GameSetup({ onStart }: GameSetupProps) {
   const [role, setRole] = useState<HumanRole>("spymaster");
-  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [model, setModel] = useState<string>("");
+  const [modelsError, setModelsError] = useState(false);
+
+  useEffect(() => {
+    getAvailableModels()
+      .then(setAvailableModels)
+      .catch(() => setModelsError(true));
+  }, []);
 
   return (
     <div className="flex w-full max-w-md flex-col gap-8">
@@ -65,25 +72,58 @@ export function GameSetup({ onStart }: GameSetupProps) {
       </div>
 
       <div className="flex flex-col gap-3">
-        <FieldLabel>Difficulty</FieldLabel>
-        <div className="grid grid-cols-4 gap-2">
-          {DIFFICULTIES.map((d) => (
-            <OptionButton
-              key={d}
-              selected={difficulty === d}
-              onClick={() => setDifficulty(d)}
+        <div className="flex items-center gap-1.5">
+          <FieldLabel>Model</FieldLabel>
+          <span className="group relative flex">
+            <span
+              tabIndex={0}
               className={cn(
-                "rounded-md px-3 py-2 text-sm capitalize",
-                difficulty === d && "font-medium",
+                "flex h-4 w-4 cursor-help items-center justify-center rounded-full border text-[10px] leading-none",
+                "border-zinc-400 text-zinc-500 dark:border-zinc-600 dark:text-zinc-400",
+              )}
+              aria-label="Only models that support text completion are listed."
+            >
+              i
+            </span>
+            <span
+              role="tooltip"
+              className={cn(
+                "pointer-events-none absolute bottom-full left-1/2 mb-2 w-64 -translate-x-1/2 rounded-md border px-3 py-2 text-xs opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
+                "border-zinc-300 bg-background text-foreground dark:border-zinc-700",
               )}
             >
-              {d}
-            </OptionButton>
-          ))}
+              Only models that support text completion (Ollama&apos;s{" "}
+              <code>completion</code> capability) are listed —
+              embedding-only models can&apos;t drive a chat turn and won&apos;t
+              appear here.
+            </span>
+          </span>
         </div>
+        {modelsError ? (
+          <p className={cn("text-xs", MUTED_TEXT)}>
+            Couldn&apos;t reach Ollama — using the default model.
+          </p>
+        ) : availableModels.length === 0 ? (
+          <p className={cn("text-xs", MUTED_TEXT)}>
+            Loading installed models…
+          </p>
+        ) : (
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm text-foreground dark:border-zinc-700"
+          >
+            <option value="">Default model</option>
+            {availableModels.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
-      <Button size="pill" onClick={() => onStart(role, difficulty)}>
+      <Button size="pill" onClick={() => onStart(role, model || null)}>
         Start game
       </Button>
     </div>

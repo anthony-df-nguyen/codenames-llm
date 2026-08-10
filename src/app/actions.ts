@@ -5,6 +5,8 @@
 // key-card info (only `PublicCard[]` crosses this boundary) and so Ollama
 // config stays server-side.
 
+import { mkdir, writeFile } from "fs/promises";
+import path from "path";
 import { getSpymasterClue } from "@/lib/bots/spymaster";
 import { getGuesserGuesses, type GuesserResult } from "@/lib/bots/guesser";
 import { BASE_BOT_CONFIG, withModelOverride } from "@/lib/config/botConfig";
@@ -19,7 +21,7 @@ export async function requestSpymasterClue(
 ): Promise<Clue> {
   const config = withModelOverride(BASE_BOT_CONFIG, modelOverride);
   console.log(
-    `[ollama] spymaster clue request → model=${config.spymaster.model} team=${team}`
+    `[ollama] Spymaster Clue Request → model=${config.spymaster.model} effort=${config.spymaster.think}  team=${team}`
   );
   return getSpymasterClue(board, config, team, cluesGiven);
 }
@@ -31,7 +33,7 @@ export async function requestGuesserGuesses(
 ): Promise<GuesserResult> {
   const config = withModelOverride(BASE_BOT_CONFIG, modelOverride);
   console.log(
-    `[ollama] guesser request → model=${config.guesser.model} clue="${clue.clue}" number=${clue.number}`
+    `[ollama] Guesser request → model=${config.guesser.model} effort=${config.spymaster.think} clue="${clue.clue}" number=${clue.number}`
   );
   return getGuesserGuesses(publicBoard, clue, config);
 }
@@ -43,4 +45,19 @@ export async function getAvailableModels(): Promise<string[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * Writes a completed game's transcript to the untracked `logs/` directory.
+ * Runs server-side because the transcript export is a fs write, not
+ * something the client can do directly.
+ */
+export async function saveGameTranscript(
+  transcript: string,
+): Promise<{ filename: string }> {
+  const dir = path.join(process.cwd(), "logs");
+  await mkdir(dir, { recursive: true });
+  const filename = `game-${new Date().toISOString().replace(/[:.]/g, "-")}.txt`;
+  await writeFile(path.join(dir, filename), transcript, "utf-8");
+  return { filename };
 }

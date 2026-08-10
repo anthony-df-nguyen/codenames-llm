@@ -3,13 +3,23 @@
 import { useEffect, useState } from "react";
 import type { HumanRole } from "@/lib/game/types";
 import { getAvailableModels } from "@/app/actions";
+import {
+  loadPreferredLogging,
+  loadPreferredModel,
+  savePreferredLogging,
+  savePreferredModel,
+} from "@/lib/game/persistence";
 import { MUTED_TEXT } from "@/lib/ui/styles";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { OptionButton } from "@/components/ui/OptionButton";
 
 export interface GameSetupProps {
-  onStart: (role: HumanRole, model: string | null) => void;
+  onStart: (
+    role: HumanRole,
+    model: string | null,
+    enableLogging: boolean,
+  ) => void;
 }
 
 const ROLES: { value: HumanRole; label: string; description: string }[] = [
@@ -34,8 +44,19 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 export function GameSetup({ onStart }: GameSetupProps) {
   const [role, setRole] = useState<HumanRole>("spymaster");
   const [availableModels, setAvailableModels] = useState<string[]>([]);
-  const [model, setModel] = useState<string>("");
+  const [model, setModel] = useState<string>(() => loadPreferredModel() ?? "");
   const [modelsError, setModelsError] = useState(false);
+  const [enableLogging, setEnableLogging] = useState(() => loadPreferredLogging());
+
+  function selectModel(value: string) {
+    setModel(value);
+    savePreferredModel(value || null);
+  }
+
+  function toggleLogging(value: boolean) {
+    setEnableLogging(value);
+    savePreferredLogging(value);
+  }
 
   useEffect(() => {
     getAvailableModels()
@@ -110,7 +131,7 @@ export function GameSetup({ onStart }: GameSetupProps) {
         ) : (
           <select
             value={model}
-            onChange={(e) => setModel(e.target.value)}
+            onChange={(e) => selectModel(e.target.value)}
             className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm text-foreground dark:border-zinc-700"
           >
             <option value="">Default model</option>
@@ -123,7 +144,29 @@ export function GameSetup({ onStart }: GameSetupProps) {
         )}
       </div>
 
-      <Button size="pill" onClick={() => onStart(role, model || null)}>
+      <label className="flex items-start gap-2.5 text-sm">
+        <input
+          type="checkbox"
+          checked={enableLogging}
+          onChange={(e) => toggleLogging(e.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-zinc-300 dark:border-zinc-700"
+        />
+        <span>
+          <span className="font-medium text-foreground">
+            Enable detailed logging
+          </span>
+          <span className={cn("block text-xs", MUTED_TEXT)}>
+            Records both bots&apos; system prompts and full reasoning so you
+            can export the game as a transcript afterward, e.g. to review
+            with Claude.
+          </span>
+        </span>
+      </label>
+
+      <Button
+        size="pill"
+        onClick={() => onStart(role, model || null, enableLogging)}
+      >
         Start game
       </Button>
     </div>

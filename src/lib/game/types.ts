@@ -24,6 +24,8 @@ export type HumanRole = "spymaster" | "guesser";
 export interface Clue {
   clue: string;
   number: number;
+  /** Bot chain-of-thought behind this clue, when the model supports it. */
+  reasoning?: string;
 }
 
 /** A clue plus who gave it — the shape stored in `GameState.cluesGiven`. */
@@ -52,4 +54,12 @@ export function randomTeam(): Team {
 /** Strips the key card off a board, leaving only guesser-safe fields. */
 export function toPublicBoard(board: Card[]): PublicCard[] {
   return board.map(({ word, revealed }) => ({ word, revealed }));
+}
+
+/** Counts each team's unrevealed cards remaining on the board. */
+export function remainingCardsByTeam(board: Card[]): Record<Team, number> {
+  return {
+    red: board.filter((c) => c.type === "red" && !c.revealed).length,
+    blue: board.filter((c) => c.type === "blue" && !c.revealed).length,
+  };
 }

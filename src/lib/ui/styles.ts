@@ -49,7 +49,7 @@ export const CARD_TYPE_STYLES: Record<CardType, CardTypeStyle> = {
     swatch: "bg-blue-500 border-blue-600",
   },
   neutral: {
-    face: "bg-zinc-300 text-zinc-900 border-zinc-400 dark:bg-zinc-500 dark:text-zinc-50 dark:border-zinc-400",
+    face: "bg-zinc-300 text-zinc-700 border-zinc-400 dark:bg-gray-300 dark:text-zinc-50 dark:border-zinc-400",
     swatch: "bg-zinc-300 border-zinc-400 dark:bg-zinc-500 dark:border-zinc-400",
   },
   assassin: {

@@ -11,6 +11,13 @@ export interface GameSession {
   state: GameState | null;
   /** null = use the base config's default model for both bot roles. */
   modelOverride: string | null;
+  /**
+   * When true, the game log accumulates enough detail (system prompts +
+   * full bot reasoning) to be exported as a transcript for offline review —
+   * see lib/game/exportLog.ts. Off by default since chain-of-thought text
+   * makes the log noisy and isn't needed for normal play.
+   */
+  enableLogging: boolean;
   /** The clue the current team is guessing against, if any. */
   pendingClue: Clue | null;
   /** null = unlimited (clue number was 0). */
@@ -27,6 +34,7 @@ export type PersistedSession = GameSession & { state: GameState };
 export const INITIAL_SESSION: GameSession = {
   state: null,
   modelOverride: null,
+  enableLogging: false,
   pendingClue: null,
   guessesLeft: 0,
   guessesMade: 0,

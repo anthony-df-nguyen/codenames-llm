@@ -75,12 +75,15 @@ export async function getSpymasterClue(
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const prompt = buildUserPrompt(board, team, cluesGiven, rejectionReason);
 
-    const raw = await ollamaGenerate<Clue>({
+    const { data: raw, thinking } = await ollamaGenerate<Clue>({
       model: config.model,
       system,
       prompt,
       temperature: config.temperature,
       think: config.think,
+      topK: config.topK,
+      topP: config.topP,
+      repeatPenalty: config.repeatPenalty,
       format: RESPONSE_SCHEMA,
     });
 
@@ -90,7 +93,7 @@ export async function getSpymasterClue(
     lastResult = validateClue(clue, number, board, cluesGiven, team);
 
     if (lastResult.valid) {
-      return { clue, number };
+      return { clue, number, reasoning: thinking };
     }
 
     rejectionReason = lastResult.reason;

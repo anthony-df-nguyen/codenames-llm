@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { requestSpymasterClue } from "@/app/actions";
+import { requestSpymasterClue, saveGameTranscript } from "@/app/actions";
 import { runBotGuessTurn, describeTurnEnd } from "@/lib/game/botTurn";
+import { buildGameTranscript } from "@/lib/game/exportLog";
 import type { LogEntryInput, TurnEndReason } from "@/lib/game/log";
 import { makeLogEntry } from "@/lib/game/log";
 import {
@@ -59,6 +60,7 @@ export function useCodenamesGame() {
   const {
     state,
     modelOverride,
+    enableLogging,
     pendingClue,
     guessesLeft,
     guessesMade,
@@ -69,6 +71,7 @@ export function useCodenamesGame() {
   const [botBusy, setBotBusy] = useState(false);
   const [botPhase, setBotPhase] = useState<string | null>(null);
   const [lastGuess, setLastGuess] = useState<LastGuess | null>(null);
+  const [transcriptSaved, setTranscriptSaved] = useState<string | null>(null);
 
   const patch = useCallback((p: Patch) => dispatch({ type: "patch", patch: p }), []);
   const appendLog = useCallback(
@@ -80,6 +83,7 @@ export function useCodenamesGame() {
   const clueKeyRef = useRef<string | null>(null);
   const guessKeyRef = useRef<string | null>(null);
   const hydratedRef = useRef(false);
+  const transcriptSavedRef = useRef(false);
 
   function resetTurnGuards() {
     clueKeyRef.current = null;
@@ -94,6 +98,7 @@ export function useCodenamesGame() {
       patch({
         ...saved,
         modelOverride: saved.modelOverride ?? null,
+        enableLogging: saved.enableLogging ?? false,
         guessesMade: saved.guessesMade ?? 0,
       });
       // Leave both key guards null so a bot turn that was in flight when the
@@ -113,12 +118,13 @@ export function useCodenamesGame() {
     savePersistedGame({
       state,
       modelOverride,
+      enableLogging,
       pendingClue,
       guessesLeft,
       guessesMade,
       log,
     });
-  }, [state, modelOverride, pendingClue, guessesLeft, guessesMade, log]);
+  }, [state, modelOverride, enableLogging, pendingClue, guessesLeft, guessesMade, log]);
 
   // Bot spymaster's turn to give a clue.
   useEffect(() => {
@@ -147,6 +153,9 @@ export function useCodenamesGame() {
           guessesLeft: guessAllowance(result.number),
           guessesMade: 0,
         }));
+        if (enableLogging && result.reasoning) {
+          appendLog({ type: "reasoning", team, role: "spymaster", text: result.reasoning });
+        }
         appendLog({
           type: "clue",
           team,
@@ -166,7 +175,7 @@ export function useCodenamesGame() {
         setBotBusy(false);
         setBotPhase(null);
       });
-  }, [state, pendingClue, modelOverride, patch, appendLog]);
+  }, [state, pendingClue, modelOverride, enableLogging, patch, appendLog]);
 
   // Bot guesser's turn to guess.
   useEffect(() => {
@@ -189,19 +198,42 @@ export function useCodenamesGame() {
         setLastGuess,
       },
       modelOverride,
+      enableLogging,
     ).finally(() => {
       patch(CLUE_CLEARED);
       setBotBusy(false);
     });
-  }, [state, pendingClue, modelOverride, guessesLeft, patch, appendLog]);
+  }, [state, pendingClue, modelOverride, enableLogging, guessesLeft, patch, appendLog]);
 
-  function startGame(role: HumanRole, model: string | null) {
+  // Once a logged game ends, write its transcript to logs/ automatically —
+  // no manual copy/paste step. Guarded so it fires exactly once per game.
+  useEffect(() => {
+    if (!state?.winner || !enableLogging) return;
+    if (transcriptSavedRef.current) return;
+    transcriptSavedRef.current = true;
+
+    const transcript = buildGameTranscript(state, log, modelOverride);
+    saveGameTranscript(transcript)
+      .then(({ filename }) => setTranscriptSaved(filename))
+      .catch((e: unknown) =>
+        appendLog({
+          type: "error",
+          team: state.currentTurn,
+          message: `failed to save transcript: ${e instanceof Error ? e.message : String(e)}`,
+        }),
+      );
+  }, [state, enableLogging, log, modelOverride, appendLog]);
+
+  function startGame(role: HumanRole, model: string | null, enableLogging: boolean) {
     patch({
       ...INITIAL_SESSION,
       state: createInitialState(randomTeam(), role),
       modelOverride: model,
+      enableLogging,
     });
     setClueError(undefined);
+    setTranscriptSaved(null);
+    transcriptSavedRef.current = false;
     resetTurnGuards();
   }
 
@@ -283,6 +315,8 @@ export function useCodenamesGame() {
     setBotBusy(false);
     setBotPhase(null);
     setLastGuess(null);
+    setTranscriptSaved(null);
+    transcriptSavedRef.current = false;
     resetTurnGuards();
   }
 
@@ -313,10 +347,12 @@ export function useCodenamesGame() {
     guessesLeft,
     guessesMade,
     log,
+    enableLogging,
     clueError,
     botBusy,
     botPhase,
     lastGuess,
+    transcriptSaved,
     humanIsSpymasterNow,
     humanIsGuesserNow,
     startGame,

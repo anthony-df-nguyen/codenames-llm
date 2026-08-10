@@ -29,7 +29,7 @@ export default function Home() {
   return (
     <div className={`${PAGE_SHELL} gap-6`}>
       <div className="flex w-full max-w-6xl flex-col gap-6 xl:flex-row xl:items-start xl:justify-center">
-        <div className="flex w-full max-w-5xl flex-col items-center gap-6">
+        <div className="flex w-full max-w-3xl flex-col items-center gap-6">
           <GameHeader state={state} />
 
           <Board
@@ -69,15 +69,22 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="flex w-full max-w-md shrink-0 flex-col gap-4 xl:sticky xl:top-8 xl:h-[calc(100vh-4rem)] xl:w-72">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={game.restart}
-            className="shrink-0"
-          >
-            Restart game
-          </Button>
+        <div className="flex w-full flex-1 shrink-0 flex-col gap-4 xl:sticky xl:top-8 xl:h-[calc(100vh-4rem)] xl:w-72">
+          <div className="flex shrink-0 flex-col gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={game.restart}
+              className="w-full"
+            >
+              Restart game
+            </Button>
+            {game.transcriptSaved && (
+              <p className="text-center text-xs text-zinc-400 dark:text-zinc-600">
+                Transcript saved to logs/{game.transcriptSaved}
+              </p>
+            )}
+          </div>
 
           <GameLog entries={game.log} />
         </div>

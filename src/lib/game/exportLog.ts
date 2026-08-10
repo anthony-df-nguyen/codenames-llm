@@ -1,0 +1,60 @@
+// Assembles a game's log into a plain-text transcript suitable for pasting
+// into Claude for prompt/model tuning: the exact system prompts both bots
+// played with, plus the full chronological move-by-move record including
+// reasoning. Kept separate from log.ts (UI-facing entry shapes) since this
+// is a one-shot text formatter, not app state.
+
+import { BASE_BOT_CONFIG, withModelOverride } from "@/lib/config/botConfig";
+import type { LogEntry } from "./log";
+import { TURN_END_LABEL } from "./log";
+import type { GameState } from "./types";
+
+function formatEntry(entry: LogEntry): string {
+  switch (entry.type) {
+    case "clue":
+      return `[${entry.team} spymaster, ${entry.source}] clue: "${entry.clue}" for ${entry.number}`;
+    case "reasoning":
+      return `[${entry.team} ${entry.role} reasoning]\n${entry.text}`;
+    case "guess":
+      return `[${entry.team}, ${entry.source}] guessed "${entry.word}" (${entry.cardType}) — ${entry.correct ? "correct" : "incorrect"}`;
+    case "turn-end":
+      return `-- ${entry.team} turn ended: ${TURN_END_LABEL[entry.reason]} --`;
+    case "error":
+      return `[${entry.team} ERROR] ${entry.message}`;
+  }
+}
+
+export function buildGameTranscript(
+  state: GameState,
+  log: LogEntry[],
+  modelOverride: string | null,
+): string {
+  const config = withModelOverride(BASE_BOT_CONFIG, modelOverride);
+
+  const lines: string[] = [];
+  lines.push("# Codenames bot transcript");
+  lines.push(`Generated: ${new Date().toISOString()}`);
+  lines.push(`Human role: ${state.humanTeam} team's ${state.humanRole}`);
+  lines.push(`Spymaster model: ${config.spymaster.model}`);
+  lines.push(`Guesser model: ${config.guesser.model}`);
+  lines.push(
+    `Result: ${state.winner ? `${state.winner} team won` : "in progress"}`,
+  );
+  lines.push("");
+
+  lines.push("## Spymaster system prompt");
+  lines.push(config.spymaster.systemPrompt);
+  lines.push("");
+
+  lines.push("## Guesser system prompt");
+  lines.push(config.guesser.systemPrompt);
+  lines.push("");
+
+  lines.push("## Move log");
+  for (const entry of log) {
+    lines.push(formatEntry(entry));
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}

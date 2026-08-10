@@ -9,6 +9,8 @@ import { ollamaGenerate } from "@/lib/ollama/client";
 export interface GuesserResult {
   rankedGuesses: string[];
   stopGuessing: boolean;
+  /** Bot chain-of-thought behind this ranking, when the model supports it. */
+  reasoning?: string;
 }
 
 function buildUserPrompt(
@@ -45,12 +47,15 @@ export async function getGuesserGuesses(
   const system = config.systemPrompt;
   const prompt = buildUserPrompt(publicBoard, clue);
 
-  const raw = await ollamaGenerate<GuesserResult>({
+  const { data: raw, thinking } = await ollamaGenerate<GuesserResult>({
     model: config.model,
     system,
     prompt,
     temperature: config.temperature,
     think: config.think,
+    topK: config.topK,
+    topP: config.topP,
+    repeatPenalty: config.repeatPenalty,
     format: RESPONSE_SCHEMA,
   });
 
@@ -64,5 +69,6 @@ export async function getGuesserGuesses(
   return {
     rankedGuesses,
     stopGuessing: Boolean(raw.stopGuessing),
+    reasoning: thinking,
   };
 }

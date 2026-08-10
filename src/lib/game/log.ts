@@ -17,6 +17,13 @@ export type LogEntry =
   | { id: string; type: "clue"; team: Team; source: LogSource; clue: string; number: number }
   | {
       id: string;
+      type: "reasoning";
+      team: Team;
+      role: "spymaster" | "guesser";
+      text: string;
+    }
+  | {
+      id: string;
       type: "guess";
       team: Team;
       source: LogSource;

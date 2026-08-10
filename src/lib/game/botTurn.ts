@@ -40,6 +40,7 @@ export async function runBotGuessTurn(
   cap: number | null,
   { setState, appendLog, setPhase, setLastGuess }: BotGuessTurnHandlers,
   modelOverride: string | null = null,
+  enableLogging = false,
 ) {
   let current = initialState;
   const team = current.currentTurn;
@@ -52,8 +53,26 @@ export async function runBotGuessTurn(
       clue,
       modelOverride,
     );
+    // `cap` already includes the official +1 bonus guess for a nonzero clue
+    // number. If the bot voluntarily wants to stop, honor that by forgoing
+    // the bonus guess rather than always guessing out to the full cap.
+    const effectiveCap =
+      result.stopGuessing && clue.number > 0 ? clue.number : cap;
     guesses =
-      cap === null ? result.rankedGuesses : result.rankedGuesses.slice(0, cap);
+      effectiveCap === null
+        ? result.rankedGuesses
+        : result.rankedGuesses.slice(0, effectiveCap);
+
+    // Official rules: a team must make at least one guess per clue (mirrors
+    // the human-side check in `stopGuessing`). The model can otherwise stop
+    // before guessing at all by returning an empty ranked list.
+    if (guesses.length === 0) {
+      const fallback = current.board.find((c) => !c.revealed);
+      if (fallback) guesses = [fallback.word];
+    }
+    if (enableLogging && result.reasoning) {
+      appendLog({ type: "reasoning", team, role: "guesser", text: result.reasoning });
+    }
   } catch (e) {
     appendLog({
       type: "error",

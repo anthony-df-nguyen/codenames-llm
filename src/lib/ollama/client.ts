@@ -24,6 +24,12 @@ export interface OllamaGenerateOptions {
   // that don't, since the user can pick any model they've pulled and most
   // don't support this field at all.
   think?: "low" | "medium" | "high";
+  // Optional extra sampling params. Unlike `think`, these are generic
+  // llama.cpp options that every model accepts — no capability probe needed.
+  // Omitted fields simply fall back to Ollama's own defaults.
+  topK?: number;
+  topP?: number;
+  repeatPenalty?: number;
 }
 
 interface OllamaChatResponse {
@@ -99,9 +105,15 @@ function extractJson(raw: string): string {
   return withoutThink.slice(start, end + 1);
 }
 
+export interface OllamaGenerateResult<T> {
+  data: T;
+  /** Chain-of-thought from thinking-capable models (see `think` above); absent otherwise. */
+  thinking?: string;
+}
+
 export async function ollamaGenerate<T>(
   options: OllamaGenerateOptions
-): Promise<T> {
+): Promise<OllamaGenerateResult<T>> {
   // /api/chat (not /api/generate) — /api/generate's separate system/prompt
   // fields don't reliably drive chat-templated models (e.g. gpt-oss's
   // Harmony format), which can come back with an empty response. /api/chat
@@ -124,7 +136,14 @@ export async function ollamaGenerate<T>(
       ],
       format: options.format,
       stream: false,
-      options: { temperature: options.temperature },
+      options: {
+        temperature: options.temperature,
+        ...(options.topK !== undefined ? { top_k: options.topK } : {}),
+        ...(options.topP !== undefined ? { top_p: options.topP } : {}),
+        ...(options.repeatPenalty !== undefined
+          ? { repeat_penalty: options.repeatPenalty }
+          : {}),
+      },
       ...(think ? { think } : {}),
     }),
   });
@@ -137,22 +156,24 @@ export async function ollamaGenerate<T>(
 
   const data = (await res.json()) as OllamaChatResponse;
   const content = data.message.content;
+  const thinking = data.message.thinking || undefined;
 
-  // Local-only: surface chain-of-thought for reasoning models (qwen3, gpt-oss,
-  // deepseek-r1, ...) so prompts can be tuned per difficulty level. Non-reasoning
+  // Local-only: also surface chain-of-thought for reasoning models (qwen3,
+  // gpt-oss, deepseek-r1, ...) to the console for prompt tuning. Non-reasoning
   // models (e.g. llama3.1:8b) simply won't populate message.thinking. Gated by
   // APP_ENV so production deployments don't leak reasoning traces to logs.
-  if (IS_LOCAL && data.message.thinking) {
+  // The UI surfaces the same value via the returned `thinking` field.
+  if (IS_LOCAL && thinking) {
     console.log(
-      `\n--- [ollama thinking] ${options.model} ---\n${data.message.thinking}\n--- [end thinking] ---\n`
+      `\n--- [ollama thinking] ${options.model} ---\n${thinking}\n--- [end thinking] ---\n`
     );
   }
 
   try {
-    return JSON.parse(content) as T;
+    return { data: JSON.parse(content) as T, thinking };
   } catch {
     try {
-      return JSON.parse(extractJson(content)) as T;
+      return { data: JSON.parse(extractJson(content)) as T, thinking };
     } catch {
       throw new Error(
         `Ollama returned non-JSON response despite format: "json": ${content}`

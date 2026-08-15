@@ -37,7 +37,8 @@ function buildUserPrompt(
     ``,
     `Respond with a single-word clue that is not any board word (or a
 substring/superset of one) and a number of your team's words it connects
-(at most ${myWords.length}; 0 means your team may guess without limit).`,
+(1 to ${myWords.length}; 0 is legal but is a rare, high-risk exception meaning
+unlimited guessing — see NUMBER rules).`,
   ];
 
   if (rejectionReason) {

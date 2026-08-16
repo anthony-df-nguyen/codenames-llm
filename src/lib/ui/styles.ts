@@ -1,85 +1,69 @@
-// Shared Tailwind class tokens for the UI layer.
+// Shared color tokens for the UI layer.
 //
 // Every place that colors something by team or by card type reads from here,
 // so a palette change is a one-file edit instead of a hunt through six
 // components. Purely presentational — no game rules live in this file.
+//
+// Team/card colors are OKLCH values applied via inline style rather than
+// Tailwind classes: they're computed per-team/per-type at render time, so a
+// static utility class can't represent them.
 
 import type { CardType, Team } from "@/lib/game/types";
 
-export interface TeamStyle {
-  /** Body-copy team name (game log, headers). */
-  text: string;
-  /** Louder team name for headline treatments (clue banner). */
+export interface TeamPalette {
+  /** Revealed-card fill / key-card swatch fill. */
+  fill: string;
+  /** Revealed-card border / key-card swatch border. */
+  edge: string;
+  /** Text color on a filled team surface. */
+  fg: string;
+  /** Headline treatment — clue banner, "Turn: X", team name in log. */
   textStrong: string;
-  /** Solid fill, e.g. the bot "thinking" dots. */
+  /** Solid dot — remaining-count indicator, bot "thinking" dots. */
   dot: string;
-  /** Border + tinted background pair for team-owned panels. */
-  panel: string;
 }
 
-export const TEAM_STYLES: Record<Team, TeamStyle> = {
+export const TEAM_STYLES: Record<Team, TeamPalette> = {
   red: {
-    text: "text-red-500",
-    textStrong: "text-red-600 dark:text-red-400",
-    dot: "bg-red-500",
-    panel: "border-red-500 bg-red-50 dark:bg-red-950/30",
+    fill: "oklch(0.42 0.12 22)",
+    edge: "oklch(0.56 0.13 22)",
+    fg: "oklch(0.94 0.03 22)",
+    textStrong: "oklch(0.76 0.14 22)",
+    dot: "oklch(0.68 0.16 22)",
   },
   blue: {
-    text: "text-blue-500",
-    textStrong: "text-blue-600 dark:text-blue-400",
-    dot: "bg-blue-500",
-    panel: "border-blue-500 bg-blue-50 dark:bg-blue-950/30",
+    fill: "oklch(0.42 0.10 245)",
+    edge: "oklch(0.56 0.11 245)",
+    fg: "oklch(0.95 0.02 245)",
+    textStrong: "oklch(0.76 0.11 245)",
+    dot: "oklch(0.70 0.12 245)",
   },
 };
 
-export interface CardTypeStyle {
-  /** Full revealed-card face on the board. */
-  face: string;
-  /** Key-card square / game-log bullet. */
-  swatch: string;
+export interface CardPalette {
+  fill: string;
+  edge: string;
+  fg: string;
 }
 
-export const CARD_TYPE_STYLES: Record<CardType, CardTypeStyle> = {
-  red: {
-    face: "bg-red-500 text-white border-red-600",
-    swatch: "bg-red-500 border-red-600",
-  },
-  blue: {
-    face: "bg-blue-500 text-white border-blue-600",
-    swatch: "bg-blue-500 border-blue-600",
-  },
-  neutral: {
-    face: "bg-zinc-300 text-zinc-700 border-zinc-400 dark:bg-gray-300 dark:text-zinc-50 dark:border-zinc-400",
-    swatch: "bg-zinc-300 border-zinc-400 dark:bg-zinc-500 dark:border-zinc-400",
-  },
-  assassin: {
-    face: "bg-zinc-900 text-white border-black dark:bg-black dark:border-zinc-700",
-    swatch: "bg-zinc-900 border-black dark:bg-black dark:border-zinc-700",
-  },
+export const CARD_TYPE_STYLES: Record<CardType, CardPalette> = {
+  red: TEAM_STYLES.red,
+  blue: TEAM_STYLES.blue,
+  neutral: { fill: "#3f424d", edge: "#595d6c", fg: "#cfd3e5" },
+  assassin: { fill: "#0b0c12", edge: "#595d6c", fg: "#9397ab" },
 };
 
-/** Face-down board card. */
-export const HIDDEN_CARD_STYLE =
-  "bg-zinc-100 text-zinc-900 border-zinc-300 hover:border-zinc-400 dark:bg-zinc-800 dark:text-zinc-50 dark:border-zinc-700 dark:hover:border-zinc-600";
+/** Correct/incorrect guess result colors in the game log. */
+export const RESULT_COLORS = {
+  correct: "oklch(0.75 0.13 155)",
+  incorrect: "oklch(0.7 0.15 25)",
+};
 
-/** Neutral bordered surface: log panel, key card. */
-export const SURFACE = "rounded-md border border-zinc-300 dark:border-zinc-700";
+export const MUTED_TEXT = "text-foreground/55";
 
-export const MUTED_TEXT = "text-zinc-500 dark:text-zinc-400";
-
-/** Interactive border that brightens on hover — shared by outline controls. */
-export const OUTLINE_BORDER =
-  "border-zinc-300 hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600";
-
-export const INPUT_STYLE =
-  "rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm text-foreground outline-none focus:border-foreground dark:border-zinc-700";
-
-/**
- * Selected/unselected state for the pre-game option buttons. Shared so the
- * role and difficulty pickers can't drift apart visually.
- */
+/** Selected/unselected state for the pre-game option buttons. */
 export function selectableStyle(selected: boolean): string {
   return selected
-    ? "border-foreground bg-foreground/5"
-    : OUTLINE_BORDER;
+    ? "border-accent bg-accent/10"
+    : "border-divider hover:border-foreground/40";
 }

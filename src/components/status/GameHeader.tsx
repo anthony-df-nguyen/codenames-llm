@@ -10,12 +10,15 @@ export function GameHeader({ state }: GameHeaderProps) {
   const remaining = remainingCardsByTeam(state.board);
 
   return (
-    <div className="flex w-full items-center justify-between">
+    <div className="flex w-full items-end justify-between">
       <div>
-        <h1 className="text-xl font-semibold text-foreground">Codenames</h1>
-        <div className={cn("text-lg", MUTED_TEXT)}>
+        <h4 className="m-0 text-xl font-medium text-foreground">Codenames</h4>
+        <div className={cn("text-sm", MUTED_TEXT)}>
           You are{" "}
-          <span className={cn("font-bold", TEAM_STYLES[state.humanTeam].text)}>
+          <span
+            className="font-semibold"
+            style={{ color: TEAM_STYLES[state.humanTeam].textStrong }}
+          >
             {state.humanTeam}
           </span>{" "}
           team&apos;s {state.humanRole}
@@ -26,17 +29,20 @@ export function GameHeader({ state }: GameHeaderProps) {
           <TeamCount team="red" remaining={remaining.red} />
           <TeamCount team="blue" remaining={remaining.blue} />
         </div>
-        <div className="text-lg font-semibold text-foreground">
+        <div className="text-[15px] font-medium text-foreground">
           {state.winner ? (
-            <span className="capitalize">{state.winner} team wins!</span>
+            <span
+              className="capitalize"
+              style={{ color: TEAM_STYLES[state.winner].textStrong }}
+            >
+              {state.winner} team wins!
+            </span>
           ) : (
             <>
               Turn:{" "}
               <span
-                className={cn(
-                  "capitalize",
-                  TEAM_STYLES[state.currentTurn].text,
-                )}
+                className="capitalize font-semibold"
+                style={{ color: TEAM_STYLES[state.currentTurn].textStrong }}
               >
                 {state.currentTurn}
               </span>
@@ -57,8 +63,14 @@ function TeamCount({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className={cn("h-2.5 w-2.5 rounded-full", TEAM_STYLES[team].dot)} />
-      <span className={cn("text-lg font-bold tabular-nums", TEAM_STYLES[team].text)}>
+      <span
+        className="h-2.5 w-2.5 rounded-full"
+        style={{ background: TEAM_STYLES[team].dot }}
+      />
+      <span
+        className="text-lg font-semibold tabular-nums"
+        style={{ color: TEAM_STYLES[team].textStrong }}
+      >
         {remaining}
       </span>
       <span className={cn("text-xs capitalize", MUTED_TEXT)}>left</span>

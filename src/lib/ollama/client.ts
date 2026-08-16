@@ -163,11 +163,11 @@ export async function ollamaGenerate<T>(
   // models (e.g. llama3.1:8b) simply won't populate message.thinking. Gated by
   // APP_ENV so production deployments don't leak reasoning traces to logs.
   // The UI surfaces the same value via the returned `thinking` field.
-  if (IS_LOCAL && thinking) {
-    console.log(
-      `\n--- [ollama thinking] ${options.model} ---\n${thinking}\n--- [end thinking] ---\n`
-    );
-  }
+  // if (IS_LOCAL && thinking) {
+  //   console.log(
+  //     `\n--- [ollama thinking] ${options.model} ---\n${thinking}\n--- [end thinking] ---\n`
+  //   );
+  // }
 
   try {
     return { data: JSON.parse(content) as T, thinking };

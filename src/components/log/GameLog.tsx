@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { LogEntry, LogSource } from "@/lib/game/log";
 import { TURN_END_LABEL } from "@/lib/game/log";
-import { CARD_TYPE_STYLES, TEAM_STYLES } from "@/lib/ui/styles";
+import { RESULT_COLORS, TEAM_STYLES } from "@/lib/ui/styles";
 import { cn } from "@/lib/utils";
 
 export interface GameLogProps {
@@ -22,11 +22,8 @@ function TeamName({
 }) {
   return (
     <span
-      className={cn(
-        "capitalize",
-        bold && "font-semibold",
-        TEAM_STYLES[team].textStrong,
-      )}
+      className={cn("capitalize", bold && "font-semibold")}
+      style={{ color: TEAM_STYLES[team].textStrong }}
     >
       {team}
     </span>
@@ -45,7 +42,7 @@ function ReasoningEntry({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mb-1 rounded-md border border-zinc-200 dark:border-zinc-800">
+    <div className="mb-1 rounded-md border border-divider">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -57,7 +54,7 @@ function ReasoningEntry({
         <TeamName team={entry.team} /> {ROLE_LABEL[entry.role]} reasoning
       </button>
       {open && (
-        <p className="whitespace-pre-wrap border-t border-zinc-200 px-2 py-1.5 font-mono text-[11px] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+        <p className="whitespace-pre-wrap border-t border-divider px-2 py-1.5 font-mono text-[11px] text-foreground/45">
           {entry.text}
         </p>
       )}
@@ -85,12 +82,12 @@ function EntryRow({ entry }: { entry: LogEntry }) {
             <TeamName team={entry.team} /> team {" "}
             guesses &quot;{entry.word}&quot; —{" "}
             <span
-              className={cn(
-                "font-medium",
-                entry.correct
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-red-500 dark:text-red-400",
-              )}
+              className="font-medium"
+              style={{
+                color: entry.correct
+                  ? RESULT_COLORS.correct
+                  : RESULT_COLORS.incorrect,
+              }}
             >
               {entry.correct ? "correct" : "incorrect"}
             </span>
@@ -99,41 +96,51 @@ function EntryRow({ entry }: { entry: LogEntry }) {
       );
     case "turn-end":
       return (
-        <p className="my-6 italic text-zinc-400 dark:text-zinc-500">
+        <p className="my-6 italic text-foreground/35">
           — <span className="capitalize">{entry.team}</span>{" "}
           {TURN_END_LABEL[entry.reason]} —
         </p>
       );
     case "error":
       return (
-        <p className="text-amber-600 dark:text-amber-400">
+        <p className="text-amber-400">
           ⚠ <span className="capitalize">{entry.team}</span> {entry.message}
         </p>
       );
   }
 }
 
-export function GameLog({ entries }: GameLogProps) {
+export interface LogEntryListProps {
+  entries: LogEntry[];
+}
+
+// Shared entry-rendering used by both the sidebar `GameLog` (1c) and the
+// command-dock `GameLogRail` (1d) so move formatting stays single-sourced.
+export function LogEntryList({ entries }: LogEntryListProps) {
   const ordered = entries.slice().reverse();
+  return ordered.length === 0 ? (
+    <p className="text-foreground/35">No moves yet.</p>
+  ) : (
+    <AnimatePresence initial={false}>
+      {ordered.map((entry) => (
+        <motion.div
+          key={entry.id}
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <EntryRow entry={entry} />
+        </motion.div>
+      ))}
+    </AnimatePresence>
+  );
+}
+
+export function GameLog({ entries }: GameLogProps) {
   return (
-    <div className="flex flex-col gap-1 overflow-y-auto rounded-md border border-zinc-200 p-3 text-xs text-zinc-600 dark:border-zinc-800 dark:text-zinc-400 xl:flex-1">
+    <div className="flex min-h-0 flex-col gap-1 overflow-y-auto rounded-md border border-divider p-3 text-xs text-foreground/65 xl:flex-1">
       <p className="my-1 text-sm font-semibold text-foreground">Game log</p>
-      {ordered.length === 0 ? (
-        <p className="text-zinc-400 dark:text-zinc-600">No moves yet.</p>
-      ) : (
-        <AnimatePresence initial={false}>
-          {ordered.map((entry) => (
-            <motion.div
-              key={entry.id}
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <EntryRow entry={entry} />
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      )}
+      <LogEntryList entries={entries} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import type { Card } from "@/lib/game/types";
-import { CARD_TYPE_STYLES, HIDDEN_CARD_STYLE } from "@/lib/ui/styles";
+import { CARD_TYPE_STYLES } from "@/lib/ui/styles";
 import { cn } from "@/lib/utils";
 
 export interface BoardProps {
@@ -26,6 +26,7 @@ export function Board({
       {cards.map((card) => {
         const clickable = !card.revealed && !disabled && Boolean(onCardClick);
         const isHighlighted = card.word === highlightWord;
+        const palette = CARD_TYPE_STYLES[card.type];
 
         return (
           <button
@@ -33,20 +34,33 @@ export function Board({
             type="button"
             disabled={!clickable}
             onClick={() => onCardClick?.(card.word)}
-            className={cn(
-              "relative flex h-20 items-center justify-center rounded-md border px-2 text-center text-xs font-semibold uppercase tracking-wide transition-colors sm:text-sm",
+            style={
               card.revealed
-                ? `${CARD_TYPE_STYLES[card.type].face} opacity-70`
-                : HIDDEN_CARD_STYLE,
+                ? {
+                    background: palette.fill,
+                    borderColor: palette.edge,
+                    color: palette.fg,
+                    opacity: 0.4,
+                  }
+                : undefined
+            }
+            className={cn(
+              "relative flex h-20 items-center justify-center rounded-md border px-2 text-center text-xs font-medium uppercase tracking-wide transition-colors sm:text-sm",
+              !card.revealed &&
+                "border-divider bg-surface text-foreground hover:border-foreground/40",
               clickable ? "cursor-pointer" : "cursor-default",
             )}
           >
             {isHighlighted && (
               <motion.span
-                className={cn(
-                  "pointer-events-none absolute inset-0 rounded-md ring-4",
-                  highlightCorrect ? "ring-emerald-400" : "ring-amber-400",
-                )}
+                className="pointer-events-none absolute inset-0 rounded-md"
+                style={{
+                  boxShadow: `0 0 0 4px ${
+                    highlightCorrect
+                      ? "oklch(0.75 0.13 155 / 0.8)"
+                      : "oklch(0.75 0.15 80 / 0.8)"
+                  }`,
+                }}
                 initial={{ opacity: 0.9, scale: 1.06 }}
                 animate={{ opacity: 0, scale: 1 }}
                 transition={{ duration: 1.1, ease: "easeOut" }}

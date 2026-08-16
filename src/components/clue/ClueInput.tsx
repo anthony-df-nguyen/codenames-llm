@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { validateClueFormat } from "@/lib/game/state";
-import { INPUT_STYLE } from "@/lib/ui/styles";
+import { RESULT_COLORS } from "@/lib/ui/styles";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 
@@ -43,7 +43,7 @@ export function ClueInput({ onSubmit, error, disabled }: ClueInputProps) {
           onChange={(e) => setClue(e.target.value)}
           placeholder="Clue"
           disabled={disabled}
-          className={cn("flex-1", INPUT_STYLE)}
+          className={cn("input flex-2")}
         />
         <input
           type="number"
@@ -52,14 +52,16 @@ export function ClueInput({ onSubmit, error, disabled }: ClueInputProps) {
           value={number}
           onChange={(e) => setNumber(Number(e.target.value))}
           disabled={disabled}
-          className={cn("w-16", INPUT_STYLE)}
+          className={cn("input flex-1 text-center")}
         />
         <Button type="submit" disabled={disabled}>
           Give clue
         </Button>
       </div>
       {(localError || error) && (
-        <p className="text-xs text-red-500">{localError ?? error}</p>
+        <p className="text-xs" style={{ color: RESULT_COLORS.incorrect }}>
+          {localError ?? error}
+        </p>
       )}
     </form>
   );

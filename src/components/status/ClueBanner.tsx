@@ -34,21 +34,20 @@ export function ClueBanner({
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className={cn(
-        "flex w-full flex-col items-center gap-3 rounded-xl border-2 px-6 py-4 text-center",
-        TEAM_STYLES[team].panel,
-      )}
+      className="flex w-full flex-col items-center gap-3 rounded-lg border-2 px-6 py-4 text-center"
+      style={{
+        borderColor: TEAM_STYLES[team].textStrong,
+        background: `color-mix(in srgb, ${TEAM_STYLES[team].textStrong} 10%, transparent)`,
+      }}
     >
       <div className="flex items-baseline gap-3">
         <span
-          className={cn(
-            "text-3xl font-extrabold uppercase tracking-wide",
-            TEAM_STYLES[team].textStrong,
-          )}
+          className="text-3xl font-semibold uppercase tracking-wide"
+          style={{ color: TEAM_STYLES[team].textStrong }}
         >
           {clue.clue}
         </span>
-        <span className="text-3xl font-extrabold text-foreground">
+        <span className="text-3xl font-semibold text-foreground">
           {clue.number}
         </span>
       </div>

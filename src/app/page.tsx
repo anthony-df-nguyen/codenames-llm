@@ -1,22 +1,28 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { GameSetup } from "@/components/setup/GameSetup";
-import { Board } from "@/components/board/Board";
-import { KeyCard } from "@/components/board/KeyCard";
-import { ClueInput } from "@/components/clue/ClueInput";
-import { GameLog } from "@/components/log/GameLog";
-import { ClueBanner } from "@/components/status/ClueBanner";
-import { BotStatus } from "@/components/status/BotStatus";
-import { GameHeader } from "@/components/status/GameHeader";
+import { SpymasterLayout } from "@/components/layout/SpymasterLayout";
+import { GuesserLayout } from "@/components/layout/GuesserLayout";
 import { Button } from "@/components/ui/Button";
+import { TEAM_STYLES } from "@/lib/ui/styles";
 import { useCodenamesGame } from "@/hooks/useCodenamesGame";
 
-const PAGE_SHELL =
-  "flex flex-1 flex-col items-center bg-zinc-50 p-8 font-sans dark:bg-black";
+const PAGE_SHELL = "flex flex-1 flex-col items-center bg-background p-8";
 
 export default function Home() {
   const game = useCodenamesGame();
   const { state } = game;
+  const [dialogDismissed, setDialogDismissed] = useState(false);
+
+  // `dialogDismissed` is local UI state, not part of the game session, so
+  // starting a new game (state going back to null for the setup screen)
+  // doesn't clear it on its own. Without this, dismissing the dialog once
+  // then playing another game to a win leaves the popup permanently
+  // suppressed until a full page refresh.
+  useEffect(() => {
+    if (!state) setDialogDismissed(false);
+  }, [state]);
 
   if (!state) {
     return (
@@ -26,69 +32,60 @@ export default function Home() {
     );
   }
 
+  const showWinDialog = Boolean(state.winner) && !dialogDismissed;
+
   return (
     <div className={`${PAGE_SHELL} gap-6`}>
-      <div className="flex w-full max-w-6xl flex-col gap-6 xl:flex-row xl:items-start xl:justify-center">
-        <div className="flex w-full max-w-3xl flex-col items-center gap-6">
-          <GameHeader state={state} />
+      <div
+        className={`flex w-full flex-col items-center ${
+          showWinDialog ? "opacity-45 blur-[1px]" : ""
+        }`}
+      >
+        {state.humanRole === "guesser" ? (
+          <GuesserLayout game={game} state={state} />
+        ) : (
+          <SpymasterLayout game={game} state={state} />
+        )}
+      </div>
 
-          <Board
-            cards={state.board}
-            onCardClick={game.humanIsGuesserNow ? game.submitGuess : undefined}
-            disabled={game.botBusy || !game.humanIsGuesserNow}
-            highlightWord={game.lastGuess?.word ?? null}
-            highlightCorrect={game.lastGuess?.correct ?? null}
-          />
-
-          {state.humanRole === "spymaster" && <KeyCard cards={state.board} />}
-
-          <div className="flex w-full max-w-md flex-col items-center gap-3">
-            {state.winner ? (
-              <Button size="pill" onClick={game.endSession}>
-                New game
-              </Button>
-            ) : game.humanIsSpymasterNow ? (
-              <ClueInput
-                onSubmit={game.submitClue}
-                error={game.clueError}
-                disabled={game.botBusy}
-              />
-            ) : game.pendingClue ? (
-              <ClueBanner
-                clue={game.pendingClue}
-                team={state.currentTurn}
-                guessesLeft={game.guessesLeft}
-                interactive={game.humanIsGuesserNow}
-                canStop={game.guessesMade > 0}
-                onStop={game.stopGuessing}
-                phase={game.humanIsGuesserNow ? null : game.botPhase}
-              />
-            ) : (
-              <BotStatus phase={game.botPhase} team={state.currentTurn} />
-            )}
-          </div>
-        </div>
-
-        <div className="flex w-full flex-1 shrink-0 flex-col gap-4 xl:sticky xl:top-8 xl:h-[calc(100vh-4rem)] xl:w-72">
-          <div className="flex shrink-0 flex-col gap-2">
+      {showWinDialog && state.winner && (
+        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/45 p-4">
+          <div
+            className="flex w-[380px] flex-col items-center gap-1.5 rounded-lg bg-surface p-10 text-center shadow-lg"
+            style={{ boxShadow: "var(--shadow-lg)" }}
+          >
+            <span
+              className="mb-2 h-3 w-3 rounded-full"
+              style={{ background: TEAM_STYLES[state.winner].dot }}
+            />
+            <h3
+              className="m-0 text-2xl font-medium capitalize"
+              style={{ color: TEAM_STYLES[state.winner].textStrong }}
+            >
+              {state.winner} team wins!
+            </h3>
+            <p className="mb-3.5 mt-0.5 text-[13px] text-foreground/60">
+              All 9 {state.winner} agents contacted.
+            </p>
+            <Button size="pill" className="w-full" onClick={game.endSession}>
+              New game
+            </Button>
             <Button
               variant="outline"
-              size="sm"
-              onClick={game.restart}
+              size="md"
               className="w-full"
+              onClick={() => setDialogDismissed(true)}
             >
-              Restart game
+              Review game log
             </Button>
             {game.transcriptSaved && (
-              <p className="text-center text-xs text-zinc-400 dark:text-zinc-600">
+              <span className="mt-2.5 font-mono text-[11px] text-foreground/40">
                 Transcript saved to logs/{game.transcriptSaved}
-              </p>
+              </span>
             )}
           </div>
-
-          <GameLog entries={game.log} />
         </div>
-      </div>
+      )}
     </div>
   );
 }

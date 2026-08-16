@@ -24,17 +24,32 @@ function formatEntry(entry: LogEntry): string {
   }
 }
 
+export interface TranscriptOptions {
+  /**
+   * Set when both seats on both teams are bot-controlled (headless
+   * self-play — see scripts/simulate.ts) so the header doesn't print a
+   * meaningless humanTeam/humanRole pairing left over from GameState's
+   * required fields.
+   */
+  selfPlay?: boolean;
+}
+
 export function buildGameTranscript(
   state: GameState,
   log: LogEntry[],
   modelOverride: string | null,
+  opts: TranscriptOptions = {},
 ): string {
   const config = withModelOverride(BASE_BOT_CONFIG, modelOverride);
 
   const lines: string[] = [];
   lines.push("# Codenames bot transcript");
   lines.push(`Generated: ${new Date().toISOString()}`);
-  lines.push(`Human role: ${state.humanTeam} team's ${state.humanRole}`);
+  lines.push(
+    opts.selfPlay
+      ? `Human role: none — fully self-play (bot vs bot, both seats)`
+      : `Human role: ${state.humanTeam} team's ${state.humanRole}`,
+  );
   lines.push(`Spymaster model: ${config.spymaster.model}`);
   lines.push(`Guesser model: ${config.guesser.model}`);
   lines.push(

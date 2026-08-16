@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { requestSpymasterClue, saveGameTranscript } from "@/app/actions";
+import { recordGameResult, requestSpymasterClue, saveGameTranscript } from "@/app/actions";
 import { runBotGuessTurn, describeTurnEnd } from "@/lib/game/botTurn";
 import { buildGameTranscript } from "@/lib/game/exportLog";
 import type { LogEntryInput, TurnEndReason } from "@/lib/game/log";
@@ -9,6 +9,12 @@ import { makeLogEntry } from "@/lib/game/log";
 import {
   clearPersistedGame,
   loadPersistedGame,
+  loadShowGuesserReasoning,
+  loadShowSpymasterReasoning,
+  loadShowTimestamps,
+  saveShowGuesserReasoning,
+  saveShowSpymasterReasoning,
+  saveShowTimestamps,
   savePersistedGame,
 } from "@/lib/game/persistence";
 import type { GameSession, LastGuess } from "@/lib/game/session";
@@ -73,6 +79,35 @@ export function useCodenamesGame() {
   const [lastGuess, setLastGuess] = useState<LastGuess | null>(null);
   const [transcriptSaved, setTranscriptSaved] = useState<string | null>(null);
 
+  // Display-only filters for the live game log — reasoning is always
+  // captured (for transcript export) regardless of these. Standalone
+  // preferences, so they carry over between games; can be flipped mid-game.
+  const [showSpymasterReasoning, setShowSpymasterReasoningState] =
+    useState(false);
+  const [showGuesserReasoning, setShowGuesserReasoningState] = useState(true);
+  const [showTimestamps, setShowTimestampsState] = useState(false);
+
+  useEffect(() => {
+    setShowSpymasterReasoningState(loadShowSpymasterReasoning());
+    setShowGuesserReasoningState(loadShowGuesserReasoning());
+    setShowTimestampsState(loadShowTimestamps());
+  }, []);
+
+  function setShowSpymasterReasoning(value: boolean) {
+    setShowSpymasterReasoningState(value);
+    saveShowSpymasterReasoning(value);
+  }
+
+  function setShowGuesserReasoning(value: boolean) {
+    setShowGuesserReasoningState(value);
+    saveShowGuesserReasoning(value);
+  }
+
+  function setShowTimestamps(value: boolean) {
+    setShowTimestampsState(value);
+    saveShowTimestamps(value);
+  }
+
   const patch = useCallback((p: Patch) => dispatch({ type: "patch", patch: p }), []);
   const appendLog = useCallback(
     (entry: LogEntryInput) => dispatch({ type: "appendLog", entry }),
@@ -84,6 +119,7 @@ export function useCodenamesGame() {
   const guessKeyRef = useRef<string | null>(null);
   const hydratedRef = useRef(false);
   const transcriptSavedRef = useRef(false);
+  const statsRecordedRef = useRef(false);
 
   function resetTurnGuards() {
     clueKeyRef.current = null;
@@ -153,8 +189,14 @@ export function useCodenamesGame() {
           guessesLeft: guessAllowance(result.number),
           guessesMade: 0,
         }));
-        if (enableLogging && result.reasoning) {
-          appendLog({ type: "reasoning", team, role: "spymaster", text: result.reasoning });
+        if (result.reasoning) {
+          appendLog({
+            type: "reasoning",
+            team,
+            role: "spymaster",
+            text: result.reasoning,
+            durationMs: result.reasoningDurationMs,
+          });
         }
         appendLog({
           type: "clue",
@@ -175,7 +217,7 @@ export function useCodenamesGame() {
         setBotBusy(false);
         setBotPhase(null);
       });
-  }, [state, pendingClue, modelOverride, enableLogging, patch, appendLog]);
+  }, [state, pendingClue, modelOverride, patch, appendLog]);
 
   // Bot guesser's turn to guess.
   useEffect(() => {
@@ -198,12 +240,28 @@ export function useCodenamesGame() {
         setLastGuess,
       },
       modelOverride,
-      enableLogging,
     ).finally(() => {
       patch(CLUE_CLEARED);
       setBotBusy(false);
     });
-  }, [state, pendingClue, modelOverride, enableLogging, guessesLeft, patch, appendLog]);
+  }, [state, pendingClue, modelOverride, guessesLeft, patch, appendLog]);
+
+  // Record the win/loss to the on-disk stats file once per finished game,
+  // independent of the logging toggle — this is always-on, unlike the
+  // transcript export below.
+  useEffect(() => {
+    if (!state?.winner) return;
+    if (statsRecordedRef.current) return;
+    statsRecordedRef.current = true;
+    recordGameResult(state.humanRole, state.winner === state.humanTeam).catch(
+      (e: unknown) =>
+        appendLog({
+          type: "error",
+          team: state.currentTurn,
+          message: `failed to record stats: ${e instanceof Error ? e.message : String(e)}`,
+        }),
+    );
+  }, [state, appendLog]);
 
   // Once a logged game ends, write its transcript to logs/ automatically —
   // no manual copy/paste step. Guarded so it fires exactly once per game.
@@ -234,6 +292,7 @@ export function useCodenamesGame() {
     setClueError(undefined);
     setTranscriptSaved(null);
     transcriptSavedRef.current = false;
+    statsRecordedRef.current = false;
     resetTurnGuards();
   }
 
@@ -317,6 +376,7 @@ export function useCodenamesGame() {
     setLastGuess(null);
     setTranscriptSaved(null);
     transcriptSavedRef.current = false;
+    statsRecordedRef.current = false;
     resetTurnGuards();
   }
 
@@ -355,6 +415,12 @@ export function useCodenamesGame() {
     transcriptSaved,
     humanIsSpymasterNow,
     humanIsGuesserNow,
+    showSpymasterReasoning,
+    showGuesserReasoning,
+    showTimestamps,
+    setShowSpymasterReasoning,
+    setShowGuesserReasoning,
+    setShowTimestamps,
     startGame,
     submitClue,
     submitGuess,

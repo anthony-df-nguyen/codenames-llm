@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { GameSetup } from "@/components/setup/GameSetup";
+import { GameStatsPanel } from "@/components/stats/GameStatsPanel";
 import { SpymasterLayout } from "@/components/layout/SpymasterLayout";
 import { GuesserLayout } from "@/components/layout/GuesserLayout";
 import { Button } from "@/components/ui/Button";
@@ -28,6 +29,7 @@ export default function Home() {
     return (
       <div className={`${PAGE_SHELL} justify-center`}>
         <GameSetup onStart={game.startGame} />
+        <GameStatsPanel />
       </div>
     );
   }

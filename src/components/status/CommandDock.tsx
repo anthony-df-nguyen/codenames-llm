@@ -8,9 +8,9 @@ export interface CommandDockProps {
   onRestart: () => void;
 }
 
-// Top bar for the guesser layout (1d): team counts and a restart control.
-// The pending-clue pill and bot status now render below the board, same as
-// the spymaster layout's ClueBanner/BotStatus placement.
+// Top bar for the command-dock layout: team counts and a restart control.
+// The pending-clue pill and bot status render below the board. Shared by
+// both the spymaster and guesser layouts.
 export function CommandDock({ state, onRestart }: CommandDockProps) {
   const remaining = remainingCardsByTeam(state.board);
 
@@ -28,7 +28,7 @@ export function CommandDock({ state, onRestart }: CommandDockProps) {
           >
             {state.humanTeam}
           </span>{" "}
-          team&apos;s guesser
+          team&apos;s {state.humanRole}
         </span>
       </div>
 

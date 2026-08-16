@@ -55,9 +55,9 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 export function GameSetup({ onStart }: GameSetupProps) {
   const [role, setRole] = useState<HumanRole>("spymaster");
   const [availableModels, setAvailableModels] = useState<string[]>([]);
-  const [model, setModel] = useState<string>("");
+  const [model, setModel] = useState<string>(() => loadPreferredModel() ?? "");
   const [modelsError, setModelsError] = useState(false);
-  const [enableLogging, setEnableLogging] = useState(false);
+  const [enableLogging, setEnableLogging] = useState(() => loadPreferredLogging());
 
   function selectModel(value: string) {
     setModel(value);
@@ -73,11 +73,6 @@ export function GameSetup({ onStart }: GameSetupProps) {
     getAvailableModels()
       .then(setAvailableModels)
       .catch(() => setModelsError(true));
-  }, []);
-
-  useEffect(() => {
-    setModel(loadPreferredModel() ?? "");
-    setEnableLogging(loadPreferredLogging());
   }, []);
 
   return (
@@ -258,10 +253,11 @@ export function GameSetup({ onStart }: GameSetupProps) {
           />
           <span>
             <span className="font-medium text-foreground">
-              Enable detailed logging
+              Save logs
             </span>{" "}
             <span className={cn("text-xs", MUTED_TEXT)}>
-              — export a transcript after the game
+              — writes a full move-by-move transcript (clues, guesses, bot
+              reasoning, system prompts) to the logs/ folder
             </span>
           </span>
         </label>

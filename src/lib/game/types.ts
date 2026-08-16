@@ -26,6 +26,8 @@ export interface Clue {
   number: number;
   /** Bot chain-of-thought behind this clue, when the model supports it. */
   reasoning?: string;
+  /** Wall-clock time the bot spent generating this clue, in milliseconds. */
+  reasoningDurationMs?: number;
 }
 
 /** A clue plus who gave it — the shape stored in `GameState.cluesGiven`. */

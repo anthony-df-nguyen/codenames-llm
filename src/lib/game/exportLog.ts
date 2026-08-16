@@ -10,17 +10,23 @@ import { TURN_END_LABEL } from "./log";
 import type { GameState } from "./types";
 
 function formatEntry(entry: LogEntry): string {
+  const ts = `[${new Date(entry.timestamp).toISOString()}] `;
   switch (entry.type) {
     case "clue":
-      return `[${entry.team} spymaster, ${entry.source}] clue: "${entry.clue}" for ${entry.number}`;
-    case "reasoning":
-      return `[${entry.team} ${entry.role} reasoning]\n${entry.text}`;
+      return `${ts}[${entry.team} spymaster, ${entry.source}] clue: "${entry.clue}" for ${entry.number}`;
+    case "reasoning": {
+      const duration =
+        entry.durationMs !== undefined
+          ? ` (${(entry.durationMs / 1000).toFixed(1)}s)`
+          : "";
+      return `${ts}[${entry.team} ${entry.role} reasoning]${duration}\n${entry.text}`;
+    }
     case "guess":
-      return `[${entry.team}, ${entry.source}] guessed "${entry.word}" (${entry.cardType}) — ${entry.correct ? "correct" : "incorrect"}`;
+      return `${ts}[${entry.team}, ${entry.source}] guessed "${entry.word}" (${entry.cardType}) — ${entry.correct ? "correct" : "incorrect"}`;
     case "turn-end":
-      return `-- ${entry.team} turn ended: ${TURN_END_LABEL[entry.reason]} --`;
+      return `${ts}-- ${entry.team} turn ended: ${TURN_END_LABEL[entry.reason]} --`;
     case "error":
-      return `[${entry.team} ERROR] ${entry.message}`;
+      return `${ts}[${entry.team} ERROR] ${entry.message}`;
   }
 }
 

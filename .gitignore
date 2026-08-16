@@ -43,3 +43,6 @@ next-env.d.ts
 
 # game transcripts (exported automatically at game end)
 /logs/
+
+# local win/loss stats (player-specific play data, not source)
+/data/

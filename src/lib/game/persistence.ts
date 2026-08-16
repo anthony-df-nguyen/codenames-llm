@@ -79,3 +79,69 @@ export function savePreferredLogging(enabled: boolean) {
     // Ignore — see savePersistedGame.
   }
 }
+
+// Whether each bot role's reasoning is shown in the live game log. Reasoning
+// is always captured (for transcript export) regardless of these — they're
+// purely a display filter, so they're a standalone preference like the
+// model/logging ones above, not part of in-progress session state. Guesser
+// defaults on (useful to watch it think); spymaster defaults off (would
+// leak clue-giving strategy the human guesser shouldn't see mid-game, and
+// is noisier).
+const SHOW_SPYMASTER_REASONING_KEY = "codenames-show-spymaster-reasoning";
+const SHOW_GUESSER_REASONING_KEY = "codenames-show-guesser-reasoning";
+
+export function loadShowSpymasterReasoning(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.localStorage.getItem(SHOW_SPYMASTER_REASONING_KEY);
+    return raw === null ? false : raw === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function saveShowSpymasterReasoning(enabled: boolean) {
+  try {
+    window.localStorage.setItem(SHOW_SPYMASTER_REASONING_KEY, String(enabled));
+  } catch {
+    // Ignore — see savePersistedGame.
+  }
+}
+
+export function loadShowGuesserReasoning(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const raw = window.localStorage.getItem(SHOW_GUESSER_REASONING_KEY);
+    return raw === null ? true : raw === "true";
+  } catch {
+    return true;
+  }
+}
+
+export function saveShowGuesserReasoning(enabled: boolean) {
+  try {
+    window.localStorage.setItem(SHOW_GUESSER_REASONING_KEY, String(enabled));
+  } catch {
+    // Ignore — see savePersistedGame.
+  }
+}
+
+const SHOW_TIMESTAMPS_KEY = "codenames-show-timestamps";
+
+export function loadShowTimestamps(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.localStorage.getItem(SHOW_TIMESTAMPS_KEY);
+    return raw === null ? false : raw === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function saveShowTimestamps(enabled: boolean) {
+  try {
+    window.localStorage.setItem(SHOW_TIMESTAMPS_KEY, String(enabled));
+  } catch {
+    // Ignore — see savePersistedGame.
+  }
+}

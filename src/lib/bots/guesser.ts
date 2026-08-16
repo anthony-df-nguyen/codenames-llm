@@ -11,6 +11,8 @@ export interface GuesserResult {
   stopGuessing: boolean;
   /** Bot chain-of-thought behind this ranking, when the model supports it. */
   reasoning?: string;
+  /** Wall-clock time the bot spent generating this ranking, in milliseconds. */
+  reasoningDurationMs?: number;
 }
 
 function buildUserPrompt(
@@ -47,7 +49,7 @@ export async function getGuesserGuesses(
   const system = config.systemPrompt;
   const prompt = buildUserPrompt(publicBoard, clue);
 
-  const { data: raw, thinking } = await ollamaGenerate<GuesserResult>({
+  const { data: raw, thinking, durationMs } = await ollamaGenerate<GuesserResult>({
     model: config.model,
     system,
     prompt,
@@ -70,5 +72,6 @@ export async function getGuesserGuesses(
     rankedGuesses,
     stopGuessing: Boolean(raw.stopGuessing),
     reasoning: thinking,
+    reasoningDurationMs: durationMs,
   };
 }

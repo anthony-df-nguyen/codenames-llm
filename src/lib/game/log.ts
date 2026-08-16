@@ -14,16 +14,20 @@ export type TurnEndReason =
   | "win";
 
 export type LogEntry =
-  | { id: string; type: "clue"; team: Team; source: LogSource; clue: string; number: number }
+  | { id: string; timestamp: number; type: "clue"; team: Team; source: LogSource; clue: string; number: number }
   | {
       id: string;
+      timestamp: number;
       type: "reasoning";
       team: Team;
       role: "spymaster" | "guesser";
       text: string;
+      /** Wall-clock time the bot spent on this request, when known. */
+      durationMs?: number;
     }
   | {
       id: string;
+      timestamp: number;
       type: "guess";
       team: Team;
       source: LogSource;
@@ -31,17 +35,18 @@ export type LogEntry =
       cardType: CardType;
       correct: boolean;
     }
-  | { id: string; type: "turn-end"; team: Team; reason: TurnEndReason }
-  | { id: string; type: "error"; team: Team; message: string };
+  | { id: string; timestamp: number; type: "turn-end"; team: Team; reason: TurnEndReason }
+  | { id: string; timestamp: number; type: "error"; team: Team; message: string };
 
-// Plain `Omit<LogEntry, "id">` collapses the union to its shared fields —
-// this distributes the omission over each member instead, so callers keep
-// per-variant field checking (e.g. "clue" entries still require `clue`).
+// Plain `Omit<LogEntry, "id" | "timestamp">` collapses the union to its
+// shared fields — this distributes the omission over each member instead, so
+// callers keep per-variant field checking (e.g. "clue" entries still require
+// `clue`).
 type DistributiveOmit<T, K extends keyof T> = T extends unknown
   ? Omit<T, K>
   : never;
 
-export type LogEntryInput = DistributiveOmit<LogEntry, "id">;
+export type LogEntryInput = DistributiveOmit<LogEntry, "id" | "timestamp">;
 
 let counter = 0;
 function nextId(): string {
@@ -50,11 +55,11 @@ function nextId(): string {
 }
 
 export function makeLogEntry(entry: LogEntryInput): LogEntry {
-  return { ...entry, id: nextId() } as LogEntry;
+  return { ...entry, id: nextId(), timestamp: Date.now() } as LogEntry;
 }
 
 export const TURN_END_LABEL: Record<TurnEndReason, string> = {
-  "wrong-guess": "guessed a wrong-color card — turn over",
+  "wrong-guess": "guessed a wrong-color card",
   assassin: "hit the assassin!",
   "guesses-exhausted": "ran out of guesses",
   stopped: "chose to stop guessing",

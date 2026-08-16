@@ -45,7 +45,7 @@ export function Board({
                 : undefined
             }
             className={cn(
-              "relative flex h-20 items-center justify-center rounded-md border px-2 text-center text-xs font-medium uppercase tracking-wide transition-colors sm:text-sm",
+              "relative flex h-17 items-center justify-center rounded-md border px-2 text-center text-xs font-medium uppercase tracking-wide transition-colors sm:text-sm",
               !card.revealed &&
                 "border-divider bg-surface text-foreground hover:border-foreground/40",
               clickable ? "cursor-pointer" : "cursor-default",

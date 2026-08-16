@@ -34,6 +34,8 @@ export interface OllamaGenerateOptions {
 
 interface OllamaChatResponse {
   message: { content: string; thinking?: string };
+  /** Total server-side time for the request, in nanoseconds. */
+  total_duration?: number;
 }
 
 interface OllamaTagsResponse {
@@ -109,6 +111,8 @@ export interface OllamaGenerateResult<T> {
   data: T;
   /** Chain-of-thought from thinking-capable models (see `think` above); absent otherwise. */
   thinking?: string;
+  /** Wall-clock time the request took, in milliseconds. */
+  durationMs: number;
 }
 
 export async function ollamaGenerate<T>(
@@ -125,6 +129,7 @@ export async function ollamaGenerate<T>(
       ? options.think
       : undefined;
 
+  const startedAt = Date.now();
   const res = await fetch(`${OLLAMA_HOST}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -157,6 +162,13 @@ export async function ollamaGenerate<T>(
   const data = (await res.json()) as OllamaChatResponse;
   const content = data.message.content;
   const thinking = data.message.thinking || undefined;
+  // Prefer Ollama's own server-side timing (total_duration, in nanoseconds)
+  // when available — it excludes HTTP round-trip overhead; fall back to wall
+  // clock for older Ollama versions that omit it.
+  const durationMs =
+    data.total_duration !== undefined
+      ? data.total_duration / 1e6
+      : Date.now() - startedAt;
 
   // Local-only: also surface chain-of-thought for reasoning models (qwen3,
   // gpt-oss, deepseek-r1, ...) to the console for prompt tuning. Non-reasoning
@@ -170,10 +182,10 @@ export async function ollamaGenerate<T>(
   // }
 
   try {
-    return { data: JSON.parse(content) as T, thinking };
+    return { data: JSON.parse(content) as T, thinking, durationMs };
   } catch {
     try {
-      return { data: JSON.parse(extractJson(content)) as T, thinking };
+      return { data: JSON.parse(extractJson(content)) as T, thinking, durationMs };
     } catch {
       throw new Error(
         `Ollama returned non-JSON response despite format: "json": ${content}`

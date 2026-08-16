@@ -1,25 +1,32 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { LogEntry, LogSource } from "@/lib/game/log";
+import type { LogEntry } from "@/lib/game/log";
 import { TURN_END_LABEL } from "@/lib/game/log";
 import { RESULT_COLORS, TEAM_STYLES } from "@/lib/ui/styles";
 import { cn } from "@/lib/utils";
 
-export interface GameLogProps {
-  entries: LogEntry[];
+function formatTimestamp(ms: number) {
+  return new Date(ms).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
 }
 
-function sourceLabel(source: LogSource) {
-  return source === "human" ? "(you)" : "(bot)";
+function formatDurationSeconds(ms: number) {
+  return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function TeamName({
-  team,
-  bold,
-}: {
-  team: LogEntry["team"];
-  bold?: boolean;
-}) {
+function Timestamp({ ms }: { ms: number }) {
+  return (
+    <span className="mr-1.5 font-mono text-[10px] text-foreground/35">
+      {formatTimestamp(ms)}
+    </span>
+  );
+}
+
+function TeamName({ team, bold }: { team: LogEntry["team"]; bold?: boolean }) {
   return (
     <span
       className={cn("capitalize", bold && "font-semibold")}
@@ -37,21 +44,38 @@ const ROLE_LABEL: Record<"spymaster" | "guesser", string> = {
 
 function ReasoningEntry({
   entry,
+  showTimestamps,
 }: {
   entry: Extract<LogEntry, { type: "reasoning" }>;
+  showTimestamps: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mb-1 rounded-md border border-divider">
+    <div className="my-2 rounded-md border border-divider">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-1.5 px-2 py-1 text-left"
       >
-        <span className={cn("text-[10px]", open ? "rotate-90" : "", "transition-transform")}>
+        <span
+          className={cn(
+            "text-[10px]",
+            open ? "rotate-90" : "",
+            "transition-transform",
+          )}
+        >
           ▶
         </span>
+        {showTimestamps && <Timestamp ms={entry.timestamp} />}
         <TeamName team={entry.team} /> {ROLE_LABEL[entry.role]} reasoning
+        <br />
+        <div>
+          {entry.durationMs !== undefined && (
+            <span className="text-foreground/35">
+              {formatDurationSeconds(entry.durationMs)}
+            </span>
+          )}
+        </div>
       </button>
       {open && (
         <p className="whitespace-pre-wrap border-t border-divider px-2 py-1.5 font-mono text-[11px] text-foreground/45">
@@ -62,13 +86,58 @@ function ReasoningEntry({
   );
 }
 
-function EntryRow({ entry }: { entry: LogEntry }) {
+function ErrorEntry({
+  entry,
+  showTimestamps,
+}: {
+  entry: Extract<LogEntry, { type: "error" }>;
+  showTimestamps: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [summary, ...rest] = entry.message.split(": ");
+  const detail = rest.join(": ") || entry.message;
+  return (
+    <div className="my-2 rounded-md border border-amber-400/30">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-amber-400"
+      >
+        <span
+          className={cn(
+            "text-[10px]",
+            open ? "rotate-90" : "",
+            "transition-transform",
+          )}
+        >
+          ▶
+        </span>
+        {showTimestamps && <Timestamp ms={entry.timestamp} />}⚠{" "}
+        <span className="capitalize">{entry.team}</span> {summary}
+      </button>
+      {open && (
+        <p className="whitespace-pre-wrap border-t border-amber-400/30 px-2 py-1.5 font-mono text-[11px] text-amber-400/70">
+          {detail}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function EntryRow({
+  entry,
+  showTimestamps,
+}: {
+  entry: LogEntry;
+  showTimestamps: boolean;
+}) {
   switch (entry.type) {
     case "reasoning":
-      return <ReasoningEntry entry={entry} />;
+      return <ReasoningEntry entry={entry} showTimestamps={showTimestamps} />;
     case "clue":
       return (
         <p>
+          {showTimestamps && <Timestamp ms={entry.timestamp} />}
           <TeamName team={entry.team} bold /> spymaster gives clue: &nbsp;
           <span className="font-semibold text-foreground">
             &quot;{entry.clue} - {entry.number}&quot;
@@ -77,10 +146,11 @@ function EntryRow({ entry }: { entry: LogEntry }) {
       );
     case "guess":
       return (
-        <p className="flex items-center gap-1.5">
+        <p className="my-2">
+          {showTimestamps && <Timestamp ms={entry.timestamp} />}
           <span>
-            <TeamName team={entry.team} /> team {" "}
-            guesses &quot;{entry.word}&quot; —{" "}
+            <TeamName team={entry.team} /> team guesses &quot;{entry.word}&quot;
+            —{" "}
             <span
               className="font-medium"
               style={{
@@ -96,28 +166,38 @@ function EntryRow({ entry }: { entry: LogEntry }) {
       );
     case "turn-end":
       return (
-        <p className="my-6 italic text-foreground/35">
-          — <span className="capitalize">{entry.team}</span>{" "}
+        <p className="my-4 italic text-center text-foreground/35">
+          {showTimestamps && <Timestamp ms={entry.timestamp} />}—{" "}
+          <span className="capitalize">{entry.team}</span>{" "}
           {TURN_END_LABEL[entry.reason]} —
         </p>
       );
     case "error":
-      return (
-        <p className="text-amber-400">
-          ⚠ <span className="capitalize">{entry.team}</span> {entry.message}
-        </p>
-      );
+      return <ErrorEntry entry={entry} showTimestamps={showTimestamps} />;
   }
 }
 
 export interface LogEntryListProps {
   entries: LogEntry[];
+  /** Reasoning is always captured; these just filter what's displayed. */
+  showSpymasterReasoning?: boolean;
+  showGuesserReasoning?: boolean;
+  showTimestamps?: boolean;
 }
 
-// Shared entry-rendering used by both the sidebar `GameLog` (1c) and the
-// command-dock `GameLogRail` (1d) so move formatting stays single-sourced.
-export function LogEntryList({ entries }: LogEntryListProps) {
-  const ordered = entries.slice().reverse();
+export function LogEntryList({
+  entries,
+  showSpymasterReasoning = true,
+  showGuesserReasoning = true,
+  showTimestamps = false,
+}: LogEntryListProps) {
+  const visible = entries.filter((entry) => {
+    if (entry.type !== "reasoning") return true;
+    return entry.role === "spymaster"
+      ? showSpymasterReasoning
+      : showGuesserReasoning;
+  });
+  const ordered = visible.slice().reverse();
   return ordered.length === 0 ? (
     <p className="text-foreground/35">No moves yet.</p>
   ) : (
@@ -129,18 +209,70 @@ export function LogEntryList({ entries }: LogEntryListProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
         >
-          <EntryRow entry={entry} />
+          <EntryRow entry={entry} showTimestamps={showTimestamps} />
         </motion.div>
       ))}
     </AnimatePresence>
   );
 }
 
-export function GameLog({ entries }: GameLogProps) {
+export interface ReasoningTogglesProps {
+  showSpymasterReasoning: boolean;
+  showGuesserReasoning: boolean;
+  showTimestamps: boolean;
+  onShowSpymasterReasoningChange: (value: boolean) => void;
+  onShowGuesserReasoningChange: (value: boolean) => void;
+  onShowTimestampsChange: (value: boolean) => void;
+  className?: string;
+}
+
+// Mid-game display filters for the two bot roles' reasoning, plus whether to
+// show per-entry timestamps / bot thinking duration. Independent of whether
+// the transcript gets written to disk — see the setup screen's "Save
+// transcript" toggle for that.
+export function ReasoningToggles({
+  showSpymasterReasoning,
+  showGuesserReasoning,
+  showTimestamps,
+  onShowSpymasterReasoningChange,
+  onShowGuesserReasoningChange,
+  onShowTimestampsChange,
+  className,
+}: ReasoningTogglesProps) {
   return (
-    <div className="flex min-h-0 flex-col gap-1 overflow-y-auto rounded-md border border-divider p-3 text-xs text-foreground/65 xl:flex-1">
-      <p className="my-1 text-sm font-semibold text-foreground">Game log</p>
-      <LogEntryList entries={entries} />
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]",
+        className,
+      )}
+    >
+      <label className="flex cursor-pointer items-center gap-1.5 text-foreground/60">
+        <input
+          type="checkbox"
+          checked={showGuesserReasoning}
+          onChange={(e) => onShowGuesserReasoningChange(e.target.checked)}
+          className="h-3 w-3"
+        />
+        Show Guesser Reasoning
+      </label>
+      <label className="flex cursor-pointer items-center gap-1.5 text-foreground/60">
+        <input
+          type="checkbox"
+          checked={showSpymasterReasoning}
+          onChange={(e) => onShowSpymasterReasoningChange(e.target.checked)}
+          className="h-3 w-3"
+        />
+        Show Spymaster Reasoning
+      </label>
+      <label className="flex cursor-pointer items-center gap-1.5 text-foreground/60">
+        <input
+          type="checkbox"
+          checked={showTimestamps}
+          onChange={(e) => onShowTimestampsChange(e.target.checked)}
+          className="h-3 w-3"
+        />
+        Show Timestamps
+      </label>
     </div>
   );
 }

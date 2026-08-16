@@ -40,7 +40,6 @@ export async function runBotGuessTurn(
   cap: number | null,
   { setState, appendLog, setPhase, setLastGuess }: BotGuessTurnHandlers,
   modelOverride: string | null = null,
-  enableLogging = false,
 ) {
   let current = initialState;
   const team = current.currentTurn;
@@ -70,8 +69,14 @@ export async function runBotGuessTurn(
       const fallback = current.board.find((c) => !c.revealed);
       if (fallback) guesses = [fallback.word];
     }
-    if (enableLogging && result.reasoning) {
-      appendLog({ type: "reasoning", team, role: "guesser", text: result.reasoning });
+    if (result.reasoning) {
+      appendLog({
+        type: "reasoning",
+        team,
+        role: "guesser",
+        text: result.reasoning,
+        durationMs: result.reasoningDurationMs,
+      });
     }
   } catch (e) {
     appendLog({

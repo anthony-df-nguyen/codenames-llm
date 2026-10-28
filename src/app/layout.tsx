@@ -10,7 +10,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Codenames",
-  description: "Solo Codenames against Ollama-driven bots.",
+  description: "Solo Codenames against LLM-driven bots (Claude).",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

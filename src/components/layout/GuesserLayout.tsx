@@ -58,6 +58,7 @@ export function GuesserLayout({ game, state }: GuesserLayoutProps) {
           showTimestamps={game.showTimestamps}
           onShowSpymasterReasoningChange={game.setShowSpymasterReasoning}
           onShowGuesserReasoningChange={game.setShowGuesserReasoning}
+          reasoningAvailable={game.reasoningAvailable}
           onShowTimestampsChange={game.setShowTimestamps}
         />
       </div>

@@ -67,6 +67,7 @@ export function SpymasterLayout({ game, state }: SpymasterLayoutProps) {
           onShowTimestampsChange={game.setShowTimestamps}
           onShowSpymasterReasoningChange={game.setShowSpymasterReasoning}
           onShowGuesserReasoningChange={game.setShowGuesserReasoning}
+          reasoningAvailable={game.reasoningAvailable}
         />
       </div>
     </div>

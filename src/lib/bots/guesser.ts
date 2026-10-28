@@ -4,13 +4,12 @@
 
 import type { Clue, PublicCard } from "@/lib/game/types";
 import type { BotConfig } from "@/lib/config/botConfig";
-import { ollamaGenerate } from "@/lib/ollama/client";
+import { claudeGenerate } from "@/lib/claude/client";
+import { DIFFICULTY_CONFIG, type Difficulty } from "@/lib/config/difficulty";
 
 export interface GuesserResult {
   rankedGuesses: string[];
   stopGuessing: boolean;
-  /** Bot chain-of-thought behind this ranking, when the model supports it. */
-  reasoning?: string;
   /** Wall-clock time the bot spent generating this ranking, in milliseconds. */
   reasoningDurationMs?: number;
 }
@@ -43,21 +42,17 @@ const RESPONSE_SCHEMA = {
 export async function getGuesserGuesses(
   publicBoard: PublicCard[],
   clue: Clue,
-  botConfig: BotConfig
+  botConfig: BotConfig,
+  difficulty: Difficulty = "hard"
 ): Promise<GuesserResult> {
   const config = botConfig.guesser;
   const system = config.systemPrompt;
   const prompt = buildUserPrompt(publicBoard, clue);
 
-  const { data: raw, thinking, durationMs } = await ollamaGenerate<GuesserResult>({
+  const { data: raw, durationMs } = await claudeGenerate<GuesserResult>({
     model: config.model,
     system,
     prompt,
-    temperature: config.temperature,
-    think: config.think,
-    topK: config.topK,
-    topP: config.topP,
-    repeatPenalty: config.repeatPenalty,
     format: RESPONSE_SCHEMA,
   });
 
@@ -68,10 +63,18 @@ export async function getGuesserGuesses(
     validWords.has(w)
   );
 
+  // Handicap for weaker difficulties: sometimes put the runner-up first, so
+  // the best match isn't always the first word tried.
+  if (
+    rankedGuesses.length > 1 &&
+    Math.random() < DIFFICULTY_CONFIG[difficulty].guesserSwapChance
+  ) {
+    [rankedGuesses[0], rankedGuesses[1]] = [rankedGuesses[1], rankedGuesses[0]];
+  }
+
   return {
     rankedGuesses,
     stopGuessing: Boolean(raw.stopGuessing),
-    reasoning: thinking,
     reasoningDurationMs: durationMs,
   };
 }

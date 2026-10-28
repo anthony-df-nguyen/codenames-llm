@@ -223,6 +223,8 @@ export interface ReasoningTogglesProps {
   onShowSpymasterReasoningChange: (value: boolean) => void;
   onShowGuesserReasoningChange: (value: boolean) => void;
   onShowTimestampsChange: (value: boolean) => void;
+  /** False for models that don't expose reasoning (Claude) — hides those two toggles. */
+  reasoningAvailable?: boolean;
   className?: string;
 }
 
@@ -237,6 +239,7 @@ export function ReasoningToggles({
   onShowSpymasterReasoningChange,
   onShowGuesserReasoningChange,
   onShowTimestampsChange,
+  reasoningAvailable = true,
   className,
 }: ReasoningTogglesProps) {
   return (
@@ -246,24 +249,28 @@ export function ReasoningToggles({
         className,
       )}
     >
-      <label className="flex cursor-pointer items-center gap-1.5 text-foreground/60">
-        <input
-          type="checkbox"
-          checked={showGuesserReasoning}
-          onChange={(e) => onShowGuesserReasoningChange(e.target.checked)}
-          className="h-3 w-3"
-        />
-        Show Guesser Reasoning
-      </label>
-      <label className="flex cursor-pointer items-center gap-1.5 text-foreground/60">
-        <input
-          type="checkbox"
-          checked={showSpymasterReasoning}
-          onChange={(e) => onShowSpymasterReasoningChange(e.target.checked)}
-          className="h-3 w-3"
-        />
-        Show Spymaster Reasoning
-      </label>
+      {reasoningAvailable && (
+        <>
+          <label className="flex cursor-pointer items-center gap-1.5 text-foreground/60">
+            <input
+              type="checkbox"
+              checked={showGuesserReasoning}
+              onChange={(e) => onShowGuesserReasoningChange(e.target.checked)}
+              className="h-3 w-3"
+            />
+            Show Guesser Reasoning
+          </label>
+          <label className="flex cursor-pointer items-center gap-1.5 text-foreground/60">
+            <input
+              type="checkbox"
+              checked={showSpymasterReasoning}
+              onChange={(e) => onShowSpymasterReasoningChange(e.target.checked)}
+              className="h-3 w-3"
+            />
+            Show Spymaster Reasoning
+          </label>
+        </>
+      )}
       <label className="flex cursor-pointer items-center gap-1.5 text-foreground/60">
         <input
           type="checkbox"

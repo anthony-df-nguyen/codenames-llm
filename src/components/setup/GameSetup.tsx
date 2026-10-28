@@ -1,22 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { CardType, HumanRole } from "@/lib/game/types";
-import { getAvailableModels } from "@/app/actions";
 import {
+  loadPreferredDifficulty,
   loadPreferredLogging,
   loadPreferredModel,
+  savePreferredDifficulty,
   savePreferredLogging,
   savePreferredModel,
 } from "@/lib/game/persistence";
 import { CARD_TYPE_STYLES, MUTED_TEXT } from "@/lib/ui/styles";
 import { cn } from "@/lib/utils";
+import { CLAUDE_MODELS, DEFAULT_MODEL } from "@/lib/claude/models";
+import {
+  DIFFICULTIES,
+  DIFFICULTY_CONFIG,
+  type Difficulty,
+} from "@/lib/config/difficulty";
 import { Button } from "@/components/ui/Button";
 
 export interface GameSetupProps {
   onStart: (
     role: HumanRole,
     model: string | null,
+    difficulty: Difficulty,
     enableLogging: boolean,
   ) => void;
 }
@@ -54,9 +62,8 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 export function GameSetup({ onStart }: GameSetupProps) {
   const [role, setRole] = useState<HumanRole>("spymaster");
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [model, setModel] = useState<string>(() => loadPreferredModel() ?? "");
-  const [modelsError, setModelsError] = useState(false);
+  const [difficulty, setDifficulty] = useState<Difficulty>(() => loadPreferredDifficulty());
   const [enableLogging, setEnableLogging] = useState(() => loadPreferredLogging());
 
   function selectModel(value: string) {
@@ -64,16 +71,15 @@ export function GameSetup({ onStart }: GameSetupProps) {
     savePreferredModel(value || null);
   }
 
+  function selectDifficulty(value: Difficulty) {
+    setDifficulty(value);
+    savePreferredDifficulty(value);
+  }
+
   function toggleLogging(value: boolean) {
     setEnableLogging(value);
     savePreferredLogging(value);
   }
-
-  useEffect(() => {
-    getAvailableModels()
-      .then(setAvailableModels)
-      .catch(() => setModelsError(true));
-  }, []);
 
   return (
     <div className="grid w-full max-w-3xl grid-cols-1 overflow-hidden rounded-lg border border-divider shadow-lg md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
@@ -93,7 +99,7 @@ export function GameSetup({ onStart }: GameSetupProps) {
           </h2>
           <p className="max-w-[260px] text-[13px] leading-relaxed text-foreground/60">
             A local game of Codenames where the other seats at the table are
-            Ollama-driven bots.
+            LLM-driven bots, powered by Claude.
           </p>
         </div>
         <div className="flex flex-col gap-4">
@@ -116,7 +122,7 @@ export function GameSetup({ onStart }: GameSetupProps) {
             })}
           </div>
           <span className="font-mono text-[11px] text-foreground/45">
-            ollama · localhost:11434
+            claude · local CLI
           </span>
         </div>
       </div>
@@ -175,6 +181,40 @@ export function GameSetup({ onStart }: GameSetupProps) {
           </div>
         </div>
 
+        <div className="flex flex-col gap-2.5">
+          <FieldLabel>Opponent difficulty</FieldLabel>
+          <div className="flex gap-2">
+            {DIFFICULTIES.map((d) => {
+              const selected = difficulty === d;
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => selectDifficulty(d)}
+                  className="flex-1 cursor-pointer rounded-md border px-3 py-2 text-sm font-medium transition-colors"
+                  style={
+                    selected
+                      ? {
+                          borderColor: "var(--accent)",
+                          background:
+                            "color-mix(in srgb, var(--accent) 10%, transparent)",
+                          color: "var(--accent-300)",
+                        }
+                      : { borderColor: "var(--divider)" }
+                  }
+                >
+                  {DIFFICULTY_CONFIG[d].label}
+                </button>
+              );
+            })}
+          </div>
+          <span className={cn("text-[11.5px]", MUTED_TEXT)}>
+            {DIFFICULTY_CONFIG[difficulty].description} Your own teammate bot
+            always plays at full strength.
+          </span>
+        </div>
+
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5">
             <label className="text-xs font-medium uppercase tracking-wide text-foreground/60">
@@ -184,7 +224,7 @@ export function GameSetup({ onStart }: GameSetupProps) {
               <span
                 tabIndex={0}
                 className="flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-foreground/40 text-[10px] leading-none text-foreground/50"
-                aria-label="Only models that support text completion are listed."
+                aria-label="Claude models run through your logged-in claude CLI."
               >
                 i
               </span>
@@ -192,35 +232,23 @@ export function GameSetup({ onStart }: GameSetupProps) {
                 role="tooltip"
                 className="pointer-events-none absolute bottom-full left-1/2 mb-2 w-64 -translate-x-1/2 rounded-md border border-divider bg-surface px-3 py-2 text-xs text-foreground opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
               >
-                Only models that support text completion (Ollama&apos;s{" "}
-                <code>completion</code> capability) are listed —
-                embedding-only models can&apos;t drive a chat turn and
-                won&apos;t appear here.
+                Bots run through your logged-in <code>claude</code> CLI. Haiku
+                is fastest, Opus is the strongest (and slowest) player.
               </span>
             </span>
           </div>
-          {modelsError ? (
-            <p className={cn("text-xs", MUTED_TEXT)}>
-              Couldn&apos;t reach Ollama — using the default model.
-            </p>
-          ) : availableModels.length === 0 ? (
-            <p className={cn("text-xs", MUTED_TEXT)}>
-              Loading installed models…
-            </p>
-          ) : (
-            <select
-              value={model}
-              onChange={(e) => selectModel(e.target.value)}
-              className="input"
-            >
-              <option value="">Default model</option>
-              {availableModels.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          )}
+          <select
+            value={model}
+            onChange={(e) => selectModel(e.target.value)}
+            className="input"
+          >
+            <option value="">Default ({DEFAULT_MODEL})</option>
+            {CLAUDE_MODELS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
         </div>
 
         <label className="flex items-center gap-2.5 text-sm">
@@ -265,7 +293,7 @@ export function GameSetup({ onStart }: GameSetupProps) {
         <Button
           size="pill"
           className="self-start px-8"
-          onClick={() => onStart(role, model || null, enableLogging)}
+          onClick={() => onStart(role, model || null, difficulty, enableLogging)}
         >
           Start game
         </Button>

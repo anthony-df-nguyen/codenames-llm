@@ -2,6 +2,8 @@
 // or storage failure just means starting fresh, never a crash.
 
 import type { PersistedSession } from "./session";
+import { parseModel } from "@/lib/claude/models";
+import { DEFAULT_DIFFICULTY, parseDifficulty, type Difficulty } from "@/lib/config/difficulty";
 
 const STORAGE_KEY = "codenames-game";
 
@@ -41,7 +43,9 @@ const MODEL_STORAGE_KEY = "codenames-model";
 export function loadPreferredModel(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return window.localStorage.getItem(MODEL_STORAGE_KEY);
+    // Values saved before Claude became the only backend (Ollama ids,
+    // "claude:"-prefixed aliases) no longer parse and fall back to the default.
+    return parseModel(window.localStorage.getItem(MODEL_STORAGE_KEY));
   } catch {
     return null;
   }
@@ -54,6 +58,28 @@ export function savePreferredModel(model: string | null) {
     } else {
       window.localStorage.removeItem(MODEL_STORAGE_KEY);
     }
+  } catch {
+    // Ignore — see savePersistedGame.
+  }
+}
+
+const DIFFICULTY_STORAGE_KEY = "codenames-difficulty";
+
+export function loadPreferredDifficulty(): Difficulty {
+  if (typeof window === "undefined") return DEFAULT_DIFFICULTY;
+  try {
+    return (
+      parseDifficulty(window.localStorage.getItem(DIFFICULTY_STORAGE_KEY)) ??
+      DEFAULT_DIFFICULTY
+    );
+  } catch {
+    return DEFAULT_DIFFICULTY;
+  }
+}
+
+export function savePreferredDifficulty(difficulty: Difficulty) {
+  try {
+    window.localStorage.setItem(DIFFICULTY_STORAGE_KEY, difficulty);
   } catch {
     // Ignore — see savePersistedGame.
   }

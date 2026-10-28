@@ -28,6 +28,7 @@ import {
 } from "@/lib/game/state";
 import type { GameState, HumanRole, Team } from "@/lib/game/types";
 import { randomTeam } from "@/lib/game/types";
+import { parseDifficulty, type Difficulty } from "@/lib/config/difficulty";
 
 type Patch = Partial<GameSession> | ((s: GameSession) => Partial<GameSession>);
 
@@ -52,6 +53,12 @@ function sessionReducer(current: GameSession, action: Action): GameSession {
   }
 }
 
+// The human's own teammate bot always plays at full strength; difficulty only
+// applies to the opposing team.
+function botDifficulty(s: GameState, team: Team, difficulty: Difficulty): Difficulty {
+  return team === s.humanTeam ? "hard" : difficulty;
+}
+
 function isHumanControlled(s: GameState, team: Team, role: HumanRole) {
   return team === s.humanTeam && role === s.humanRole;
 }
@@ -66,6 +73,7 @@ export function useCodenamesGame() {
   const {
     state,
     modelOverride,
+    difficulty,
     enableLogging,
     pendingClue,
     guessesLeft,
@@ -134,6 +142,7 @@ export function useCodenamesGame() {
       patch({
         ...saved,
         modelOverride: saved.modelOverride ?? null,
+        difficulty: parseDifficulty(saved.difficulty) ?? "hard",
         enableLogging: saved.enableLogging ?? false,
         guessesMade: saved.guessesMade ?? 0,
       });
@@ -154,13 +163,14 @@ export function useCodenamesGame() {
     savePersistedGame({
       state,
       modelOverride,
+      difficulty,
       enableLogging,
       pendingClue,
       guessesLeft,
       guessesMade,
       log,
     });
-  }, [state, modelOverride, enableLogging, pendingClue, guessesLeft, guessesMade, log]);
+  }, [state, modelOverride, difficulty, enableLogging, pendingClue, guessesLeft, guessesMade, log]);
 
   // Bot spymaster's turn to give a clue.
   useEffect(() => {
@@ -179,6 +189,7 @@ export function useCodenamesGame() {
       team,
       state.cluesGiven,
       modelOverride,
+      botDifficulty(state, team, difficulty),
     )
       .then((result) => {
         patch((current) => ({
@@ -189,15 +200,6 @@ export function useCodenamesGame() {
           guessesLeft: guessAllowance(result.number),
           guessesMade: 0,
         }));
-        if (result.reasoning) {
-          appendLog({
-            type: "reasoning",
-            team,
-            role: "spymaster",
-            text: result.reasoning,
-            durationMs: result.reasoningDurationMs,
-          });
-        }
         appendLog({
           type: "clue",
           team,
@@ -217,7 +219,7 @@ export function useCodenamesGame() {
         setBotBusy(false);
         setBotPhase(null);
       });
-  }, [state, pendingClue, modelOverride, patch, appendLog]);
+  }, [state, pendingClue, modelOverride, difficulty, patch, appendLog]);
 
   // Bot guesser's turn to guess.
   useEffect(() => {
@@ -240,11 +242,12 @@ export function useCodenamesGame() {
         setLastGuess,
       },
       modelOverride,
+      botDifficulty(state, state.currentTurn, difficulty),
     ).finally(() => {
       patch(CLUE_CLEARED);
       setBotBusy(false);
     });
-  }, [state, pendingClue, modelOverride, guessesLeft, patch, appendLog]);
+  }, [state, pendingClue, modelOverride, difficulty, guessesLeft, patch, appendLog]);
 
   // Record the win/loss to the on-disk stats file once per finished game,
   // independent of the logging toggle — this is always-on, unlike the
@@ -270,7 +273,7 @@ export function useCodenamesGame() {
     if (transcriptSavedRef.current) return;
     transcriptSavedRef.current = true;
 
-    const transcript = buildGameTranscript(state, log, modelOverride);
+    const transcript = buildGameTranscript(state, log, modelOverride, { difficulty });
     saveGameTranscript(transcript)
       .then(({ filename }) => setTranscriptSaved(filename))
       .catch((e: unknown) =>
@@ -280,13 +283,19 @@ export function useCodenamesGame() {
           message: `failed to save transcript: ${e instanceof Error ? e.message : String(e)}`,
         }),
       );
-  }, [state, enableLogging, log, modelOverride, appendLog]);
+  }, [state, enableLogging, log, modelOverride, difficulty, appendLog]);
 
-  function startGame(role: HumanRole, model: string | null, enableLogging: boolean) {
+  function startGame(
+    role: HumanRole,
+    model: string | null,
+    difficulty: Difficulty,
+    enableLogging: boolean,
+  ) {
     patch({
       ...INITIAL_SESSION,
       state: createInitialState(randomTeam(), role),
       modelOverride: model,
+      difficulty,
       enableLogging,
     });
     setClueError(undefined);
@@ -369,7 +378,7 @@ export function useCodenamesGame() {
   }
 
   function endSession() {
-    patch({ ...INITIAL_SESSION, modelOverride });
+    patch({ ...INITIAL_SESSION, modelOverride, difficulty });
     setClueError(undefined);
     setBotBusy(false);
     setBotPhase(null);
@@ -408,6 +417,8 @@ export function useCodenamesGame() {
     guessesMade,
     log,
     enableLogging,
+    // Claude (via the CLI) returns no reasoning, so the toggles have nothing to show.
+    reasoningAvailable: false,
     clueError,
     botBusy,
     botPhase,

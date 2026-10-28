@@ -11,7 +11,7 @@
 // Usage:
 //   yarn simulate                     5 games, default model/prompt
 //   yarn simulate -- --n 20
-//   yarn simulate -- --n 20 --model qwen3:30b
+//   yarn simulate -- --n 20 --model haiku
 //   yarn simulate -- --n 5 --verbose
 //
 // Output: logs/selfplay/selfplay-<timestamp>-g<n>.txt (kept separate from
@@ -155,9 +155,6 @@ async function playOneGame(config: BotConfig, verbose: boolean): Promise<GameRes
         }),
       );
       return { state, log, aborted: true };
-    }
-    if (guesserResult.reasoning) {
-      log.push(makeLogEntry({ type: "reasoning", team, role: "guesser", text: guesserResult.reasoning }));
     }
 
     // Mirrors lib/game/botTurn.ts's runBotGuessTurn exactly (minus UI pacing).

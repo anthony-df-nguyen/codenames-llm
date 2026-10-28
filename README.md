@@ -1,7 +1,7 @@
-# Codenames vs. Ollama Bots
+# Codenames vs. Claude Bots
 
 A local, solo-playable Codenames game where you play against LLM-driven bots
-(Spymaster and/or Guesser) running through [Ollama](https://ollama.com).
+(Spymaster and/or Guesser) powered by Claude through the `claude` CLI.
 Game rules and turn logic are plain TypeScript; only clue-giving and
 guessing are delegated to an LLM.
 
@@ -9,25 +9,8 @@ guessing are delegated to an LLM.
 
 - Node.js 18+
 - [Yarn](https://classic.yarnpkg.com/) (this project uses Yarn, not npm)
-- [Ollama](https://ollama.com) installed and running locally
-
-Start Ollama and pull the default model before running the app:
-
-```bash
-ollama serve
-```
-
-```bash
-ollama pull llama3.1:8b
-```
-
-The app expects Ollama's API at `http://localhost:11434` (Ollama's default).
-Difficulty levels may use other models (see `src/lib/config/difficulty.ts`) —
-pull those as needed, e.g.:
-
-```bash
-ollama pull qwen2.5:14b
-```
+- [Claude Code](https://claude.com/claude-code) installed and logged in
+  (`claude login`) — the bots run through the CLI, no API key needed
 
 ## Setup
 
@@ -51,12 +34,12 @@ src/
   components/
     board/          Board rendering
     clue/           Clue input (human spymaster)
-    setup/          Role + difficulty selection screen
+    setup/          Role + model selection screen
   lib/
     game/           Deterministic game logic (board gen, turns, win/loss) — no LLM involvement
-    ollama/         Ollama HTTP client wrapper (structured JSON output)
+    claude/         Claude CLI wrapper (structured JSON output) + model list
     bots/           Spymaster and Guesser bot modules (separate context, never shared)
-    config/         Difficulty configs (model/temperature/prompt per bot role)
+    config/         Bot config + system prompts (model/prompt per bot role)
 ```
 
 See [CLAUDE.md](./CLAUDE.md) for full project context, architecture

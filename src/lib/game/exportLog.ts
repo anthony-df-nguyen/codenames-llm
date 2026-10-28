@@ -7,6 +7,7 @@
 import { BASE_BOT_CONFIG, withModelOverride } from "@/lib/config/botConfig";
 import type { LogEntry } from "./log";
 import { TURN_END_LABEL } from "./log";
+import { DIFFICULTY_CONFIG, type Difficulty } from "@/lib/config/difficulty";
 import type { GameState } from "./types";
 
 function formatEntry(entry: LogEntry): string {
@@ -38,6 +39,8 @@ export interface TranscriptOptions {
    * required fields.
    */
   selfPlay?: boolean;
+  /** Opponent bot strength; omitted for self-play (both sides full strength). */
+  difficulty?: Difficulty;
 }
 
 export function buildGameTranscript(
@@ -56,6 +59,11 @@ export function buildGameTranscript(
       ? `Human role: none — fully self-play (bot vs bot, both seats)`
       : `Human role: ${state.humanTeam} team's ${state.humanRole}`,
   );
+  if (opts.difficulty) {
+    lines.push(
+      `Opponent difficulty: ${DIFFICULTY_CONFIG[opts.difficulty].label} (human team's bots always full strength)`,
+    );
+  }
   lines.push(`Spymaster model: ${config.spymaster.model}`);
   lines.push(`Guesser model: ${config.guesser.model}`);
   lines.push(

@@ -2,15 +2,15 @@
 
 // Server actions: the client drives the game loop, but bot calls must happen
 // server-side so the guesser bot's request payload structurally can't carry
-// key-card info (only `PublicCard[]` crosses this boundary) and so Ollama
-// config stays server-side.
+// key-card info (only `PublicCard[]` crosses this boundary) and so the
+// Claude CLI invocation stays server-side.
 
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { getSpymasterClue } from "@/lib/bots/spymaster";
 import { getGuesserGuesses, type GuesserResult } from "@/lib/bots/guesser";
+import type { Difficulty } from "@/lib/config/difficulty";
 import { BASE_BOT_CONFIG, withModelOverride } from "@/lib/config/botConfig";
-import { listOllamaModels } from "@/lib/ollama/client";
 import type { Card, Clue, ClueRecord, HumanRole, PublicCard, Team } from "@/lib/game/types";
 import { EMPTY_STATS, recordResult, type GameStats } from "@/lib/game/stats";
 
@@ -18,34 +18,27 @@ export async function requestSpymasterClue(
   board: Card[],
   team: Team,
   cluesGiven: ClueRecord[],
-  modelOverride: string | null = null
+  modelOverride: string | null = null,
+  difficulty: Difficulty = "hard"
 ): Promise<Clue> {
   const config = withModelOverride(BASE_BOT_CONFIG, modelOverride);
   console.log(
-    `[ollama] Spymaster Clue Request → model=${config.spymaster.model} effort=${config.spymaster.think}  team=${team}`
+    `[bot] Spymaster Clue Request → model=${config.spymaster.model}  team=${team} difficulty=${difficulty}`
   );
-  return getSpymasterClue(board, config, team, cluesGiven);
+  return getSpymasterClue(board, config, team, cluesGiven, difficulty);
 }
 
 export async function requestGuesserGuesses(
   publicBoard: PublicCard[],
   clue: Clue,
-  modelOverride: string | null = null
+  modelOverride: string | null = null,
+  difficulty: Difficulty = "hard"
 ): Promise<GuesserResult> {
   const config = withModelOverride(BASE_BOT_CONFIG, modelOverride);
   console.log(
-    `[ollama] Guesser request → model=${config.guesser.model} effort=${config.spymaster.think} clue="${clue.clue}" number=${clue.number}`
+    `[bot] Guesser request → model=${config.guesser.model} clue="${clue.clue}" number=${clue.number} difficulty=${difficulty}`
   );
-  return getGuesserGuesses(publicBoard, clue, config);
-}
-
-/** Models currently pulled in the local Ollama install, for the setup picker. */
-export async function getAvailableModels(): Promise<string[]> {
-  try {
-    return await listOllamaModels();
-  } catch {
-    return [];
-  }
+  return getGuesserGuesses(publicBoard, clue, config, difficulty);
 }
 
 /**

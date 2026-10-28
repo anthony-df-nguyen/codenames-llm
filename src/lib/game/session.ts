@@ -3,6 +3,7 @@
 // because none of it is rules state — the game would play out identically
 // without it.
 
+import { DEFAULT_DIFFICULTY, type Difficulty } from "@/lib/config/difficulty";
 import type { Clue, GameState } from "./types";
 import type { LogEntry } from "./log";
 
@@ -11,6 +12,8 @@ export interface GameSession {
   state: GameState | null;
   /** null = use the base config's default model for both bot roles. */
   modelOverride: string | null;
+  /** Strength of the opposing team's bots; the human's teammate is always full strength. */
+  difficulty: Difficulty;
   /**
    * When true, the game log accumulates enough detail (system prompts +
    * full bot reasoning) to be exported as a transcript for offline review —
@@ -34,6 +37,7 @@ export type PersistedSession = GameSession & { state: GameState };
 export const INITIAL_SESSION: GameSession = {
   state: null,
   modelOverride: null,
+  difficulty: DEFAULT_DIFFICULTY,
   enableLogging: false,
   pendingClue: null,
   guessesLeft: 0,

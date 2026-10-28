@@ -1,27 +1,27 @@
-# Claude Project Instructions — Codenames vs. Ollama Bots
+# Claude Project Instructions — Codenames vs. Claude Bots
 
 ## Project Overview
 
-Building a local, solo-playable version of Codenames where I play against LLM-driven bots (Spymaster + Guesser) running through Ollama. Stack: Next.js App Router (React 19, Tailwind v4, framer-motion), server actions calling a local Ollama server. I'm a PM with a JS/React/Next.js background — assume that fluency, explain AI/prompting concepts where relevant since that's the newer territory for me.
+Building a local, solo-playable version of Codenames where I play against LLM-driven bots (Spymaster + Guesser) powered by Claude via the local `claude` CLI. Stack: Next.js App Router (React 19, Tailwind v4, framer-motion), server actions spawning `claude -p`. I'm a PM with a JS/React/Next.js background — assume that fluency, explain AI/prompting concepts where relevant since that's the newer territory for me.
 
 The four goals below are implemented and playable end to end — treat this doc as the map of what exists, not a plan for what's next.
 
 ## Goals
 
 1. Working local Next.js app implementing Codenames rules (board gen, turns, win/loss).
-2. Ollama-backed Spymaster bot: sees the key card, gives a legal one-word clue + number.
-3. Ollama-backed Guesser bot: sees only the public board + clue, selects/ranks guesses.
+2. Claude-backed Spymaster bot: sees the key card, gives a legal one-word clue + number.
+3. Claude-backed Guesser bot: sees only the public board + clue, selects/ranks guesses.
 4. **Selectable human role.** At game start, I choose to play as either Spymaster or Guesser for my team. Bots fill every other seat:
    - If I'm Spymaster: I give the clue/number (via UI input), bot plays my team's Guesser.
    - If I'm Guesser: bot plays my team's Spymaster, I make the guesses.
    - The opposing team is always fully bot-controlled (bot Spymaster + bot Guesser) regardless of my role choice.
 
-Difficulty levels (Easy/Medium/Hard/Expert) were dropped as a goal — see "Not currently implemented" below. In their place, the setup screen exposes a **model picker** (any locally-pulled Ollama model that supports `completion`) and an **"enable detailed logging"** toggle that records both bots' system prompts and reasoning for post-game transcript export.
+Difficulty (Easy/Medium/Hard) applies to the opposing team only — see "Not currently implemented" below. The setup screen also exposes a **model picker** (Claude `haiku` / `sonnet` / `opus` aliases) and an **"enable detailed logging"** toggle that records both bots' system prompts for post-game transcript export (the CLI returns no reasoning text).
 
 ## Architecture Decisions (locked in)
 
 - **Game logic is deterministic, not LLM-driven.** Board setup, turn order, win/loss conditions, clue-legality checks all live in plain JS/TS — never delegate rules enforcement to the model.
-- **Structured output only.** Ollama calls use a JSON-schema `format` for both Spymaster and Guesser responses via `/api/chat`. No free-text parsing (beyond a best-effort strip of stray `<think>` blocks / code fences some reasoning models still emit around the JSON).
+- **Structured output only.** Claude calls use the CLI's `--json-schema` for both Spymaster and Guesser responses; the validated object comes back in `structured_output`. No free-text parsing.
   - Spymaster response shape: `{ "clue": string, "number": integer }`
   - Guesser response shape: `{ "rankedGuesses": string[], "stopGuessing": boolean }`
 - **Strict separation of context.** The Guesser bot must never see the key card / team assignments in its prompt or context — no exceptions, even for debugging convenience. This holds regardless of which role I'm playing. Enforced structurally: `actions.ts`'s guesser entry point only accepts `PublicCard[]`.
@@ -36,8 +36,7 @@ src/
     page.tsx              Render only — all game logic lives in useCodenamesGame
     layout.tsx             Root layout, fonts, metadata
     actions.ts              Server actions: the ONLY client→bot boundary
-    api/ollama/generate/   Same-origin Ollama proxy (currently unused; the app
-                            reaches Ollama through server actions instead)
+    api/                   (none — the app reaches Claude only through server actions)
   hooks/
     useCodenamesGame.ts    The whole client-side game loop (see below)
   components/
@@ -65,13 +64,13 @@ src/
       spymaster.ts          Key-card-aware clue generation + re-prompt loop
       guesser.ts             Public-board-only guess ranking
     config/
-      botConfig.ts           One fixed model/temperature/think/sampling config per
-                              role (BASE_BOT_CONFIG) + withModelOverride() for the
-                              setup screen's model picker
+      botConfig.ts           One fixed model + system prompt per role (BASE_BOT_CONFIG)
+                              + withModelOverride() for the setup screen's model picker
+      difficulty.ts          Opponent difficulty levels + their handicap knobs
       system_prompts.ts      SPYMASTER_PROMPT / GUESSER_PROMPT — the actual system
                               prompt text (single source, both live here)
-    ollama/client.ts         Thin /api/chat wrapper: schema-constrained output,
-                              thinking-capability probe, model listing
+    claude/client.ts         Spawns the `claude` CLI headless: schema-constrained JSON in/out
+    claude/models.ts         CLAUDE_MODELS aliases, DEFAULT_MODEL, parseModel()
     ui/styles.ts              Shared Tailwind tokens (team + card-type colors)
     utils.ts                   cn(), sleep()
 logs/                          Manual scratch space for exported game transcripts
@@ -89,8 +88,7 @@ logs/                          Manual scratch space for exported game transcript
 
 ## Not currently implemented
 
-- **No difficulty levels.** There's a single fixed `BASE_BOT_CONFIG` (one model/temperature/prompt per role, currently `gpt-oss:20b` for both), overridable only by model via the setup screen's picker — not a tiered Easy/Medium/Hard/Expert system. If this comes back, it replaces `withModelOverride` with a difficulty→config table analogous to the old `config/difficulty.ts` plan.
-- **`api/ollama/generate/route.ts` is unused** — same-origin proxy scaffolding kept in case client-side calls are ever needed, but the app currently reaches Ollama exclusively through server actions in `actions.ts`.
+- **Difficulty is opponent-only.** Easy/Medium/Hard (`lib/config/difficulty.ts`) applies only to the team the human is NOT on; the human's teammate bot always plays at full strength. Handicaps are code-side, not prompt-side: a clue-number cap, a random pick among N ranked candidate clues (still run through `validateClue`), and a chance to swap the guesser's top two picks. Both teams use the model chosen in the setup picker.
 
 ## Commands
 
@@ -98,15 +96,13 @@ logs/                          Manual scratch space for exported game transcript
 - `yarn build` — production build, also the real typecheck
 - `yarn lint` — eslint
 - No test suite yet. Verify changes with `yarn build` plus a manual play-through.
-- Bots need a local Ollama on `:11434` (override with `OLLAMA_HOST`); the UI works without it, but bot turns will log an error entry.
+- Bots need the `claude` CLI installed and logged in (`claude login`); the UI works without it, but bot turns will log an error entry.
 
 ## Model Notes
 
-- Currently on `gpt-oss:20b` for both roles by default, selectable per-game from any locally-pulled model that reports Ollama's `completion` capability.
-- Calls go through `/api/chat` (not `/api/generate`) — needed for gpt-oss's Harmony chat template and to get chain-of-thought back separately via `message.thinking` instead of mixed into content.
-- `think: "low"` is set for both roles on thinking-capable models (gpt-oss, qwen3, deepseek-r1, ...) — Ollama's default is effectively "high," which is too slow for a watchable game. Silently dropped for models that don't support it (probed once per model via `/api/show`, then cached).
-- Spymaster: temperature 1.0, top_p 1.0 — gpt-oss's reference sampling config; pulling these down fights the Harmony reasoning format more than it helps.
-- Guesser: temperature 0.3 — a literal matching/ranking task, not a creative one.
+- Default is `sonnet` for both roles, selectable per-game: `haiku` (fastest), `sonnet`, `opus` (strongest).
+- Calls spawn `claude -p` from an empty temp dir with tools, MCP, skills, sessions and settings all disabled (see `claude/client.ts`) — the bot sees only our system prompt + user prompt, and each call costs ~1k input tokens instead of ~75k of Claude Code scaffolding.
+- The CLI exposes no temperature/sampling/thinking knobs and withholds thinking text, so there's no per-role tuning besides model and prompt, and no bot reasoning in the log.
 - Spymaster role is the harder prompting problem (needs broader associative reasoning) — if clue quality is weak, try a bigger model before over-engineering the prompt.
 - "Enable detailed logging" on the setup screen is the intended feedback loop for tuning `system_prompts.ts`: when a logged game ends, `useCodenamesGame` builds the transcript (`exportLog.ts`) and writes it to `logs/` automatically via the `saveGameTranscript` server action in `actions.ts` — no manual copy/paste. Point me at the saved file when asking for prompt changes.
 
@@ -116,4 +112,4 @@ logs/                          Manual scratch space for exported game transcript
 - When suggesting code, favor idiomatic modern Next.js/React (App Router assumed unless I say otherwise).
 - When discussing prompt design for the bots, give concrete example prompts/schemas, not just abstract advice.
 - Flag it clearly if a suggestion would blur the "game logic is code, not LLM" boundary — that's a deliberate design constraint, not an oversight.
-- I'll paste in code, error messages, or Ollama output as we go — treat those as ground truth for current state, not the plan above.
+- I'll paste in code, error messages, or CLI output as we go — treat those as ground truth for current state, not the plan above.

@@ -3,6 +3,7 @@
 // `current` state variable rather than nested setState updaters.
 
 import { requestGuesserGuesses } from "@/app/actions";
+import type { Difficulty } from "@/lib/config/difficulty";
 import { sleep } from "@/lib/utils";
 import type { LogEntryInput, TurnEndReason } from "./log";
 import type { Clue, GameState } from "./types";
@@ -40,6 +41,7 @@ export async function runBotGuessTurn(
   cap: number | null,
   { setState, appendLog, setPhase, setLastGuess }: BotGuessTurnHandlers,
   modelOverride: string | null = null,
+  difficulty: Difficulty = "hard",
 ) {
   let current = initialState;
   const team = current.currentTurn;
@@ -51,6 +53,7 @@ export async function runBotGuessTurn(
       toPublicBoard(current.board),
       clue,
       modelOverride,
+      difficulty,
     );
     // `cap` already includes the official +1 bonus guess for a nonzero clue
     // number. If the bot voluntarily wants to stop, honor that by forgoing
@@ -68,15 +71,6 @@ export async function runBotGuessTurn(
     if (guesses.length === 0) {
       const fallback = current.board.find((c) => !c.revealed);
       if (fallback) guesses = [fallback.word];
-    }
-    if (result.reasoning) {
-      appendLog({
-        type: "reasoning",
-        team,
-        role: "guesser",
-        text: result.reasoning,
-        durationMs: result.reasoningDurationMs,
-      });
     }
   } catch (e) {
     appendLog({

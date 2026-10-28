@@ -14,6 +14,7 @@ export interface GameLogRailProps {
   showTimestamps: boolean;
   onShowSpymasterReasoningChange: (value: boolean) => void;
   onShowGuesserReasoningChange: (value: boolean) => void;
+  reasoningAvailable: boolean;
   onShowTimestampsChange: (value: boolean) => void;
 }
 
@@ -28,6 +29,7 @@ export function GameLogRail({
   showTimestamps,
   onShowSpymasterReasoningChange,
   onShowGuesserReasoningChange,
+  reasoningAvailable,
   onShowTimestampsChange,
 }: GameLogRailProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -67,6 +69,7 @@ export function GameLogRail({
           showTimestamps={showTimestamps}
           onShowSpymasterReasoningChange={onShowSpymasterReasoningChange}
           onShowGuesserReasoningChange={onShowGuesserReasoningChange}
+          reasoningAvailable={reasoningAvailable}
           onShowTimestampsChange={onShowTimestampsChange}
         />
         <Button
